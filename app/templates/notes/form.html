@@ -1,0 +1,31 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ (nt.title ~ ' Note ' ~ note.ref) if note else ('New ' ~ nt.title ~ ' Note') }}{% endblock %}
+{% block crumbs %}<a href="{{ url_for('notes.index', resource=nt.key) }}">{{ nt.title }} Detail</a> / <span>{{ note.ref if note else 'New' }}</span>{% endblock %}
+{% block actions %}{% if note %}<a class="btn btn-ghost" href="{{ url_for('notes.print_note', resource=nt.key, note_id=note.id) }}" target="_blank">{{ icon('printer', 16) }} Print</a>{% endif %}{% endblock %}
+
+{% block content %}
+<form class="card" method="post" novalidate data-busy-on-submit>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-grid note-head">
+    <label class="field {{ 'has-error' if errors.note_date }}"><span>{{ nt.title }} date <em>*</em></span>
+      <input type="date" name="note_date" value="{{ form.note_date or '' }}" required>
+      {% if errors.note_date %}<small class="error-text">{{ errors.note_date }}</small>{% endif %}</label>
+    {% if nt.priced %}
+    <label class="field {{ 'has-error' if errors.vendor_id }}"><span>Vendor <em>*</em></span>
+      <select name="vendor_id"><option value="">Choose vendor…</option>
+        {% for v in vendors %}<option value="{{ v.id }}" {% if form.vendor_id|string == v.id|string %}selected{% endif %}>{{ v.name }}</option>{% endfor %}</select>
+      {% if errors.vendor_id %}<small class="error-text">{{ errors.vendor_id }}{% if not vendors %} - <a href="{{ url_for('crud.create', resource='vendors') }}">add a vendor</a>{% endif %}</small>{% endif %}</label>
+    <label class="field {{ 'has-error' if errors.invoice_no }}"><span>Invoice no</span><input type="text" name="invoice_no" value="{{ form.invoice_no or '' }}" maxlength="30"></label>
+    <label class="field"><span>Payment status</span><select name="payment_status">
+      <option value="0" {% if form.payment_status|string != '1' %}selected{% endif %}>Unpaid</option>
+      <option value="1" {% if form.payment_status|string == '1' %}selected{% endif %}>Paid</option></select></label>
+    {% endif %}
+  </div>
+  {% if not ingredients %}<div class="alert alert-warning compact">{{ icon('alert', 15) }}<span>No ingredients yet. <a href="{{ url_for('crud.create', resource='ingredients') }}">Add ingredients</a> first.</span></div>{% endif %}
+  {% with priced=nt.priced, qty_step=('1' if nt.qty_decimals == 0 else '0.' ~ '0' * (nt.qty_decimals - 1) ~ '1') %}{% include "notes/_lines.html" %}{% endwith %}
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{{ url_for('notes.index', resource=nt.key) }}">Cancel</a>
+    <button class="btn btn-primary" type="submit">{{ icon('check', 16) }} {{ 'Save changes' if note else 'Save note' }}</button>
+  </div>
+</form>
+{% endblock %}

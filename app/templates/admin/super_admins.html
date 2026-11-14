@@ -1,0 +1,56 @@
+{% extends "layouts/base.html" %}
+{% block title %}Super Admins{% endblock %}
+{% block crumbs %}<span>Super Admin</span>{% endblock %}
+
+{% block content %}
+<div class="grid-2-1">
+  <article class="card">
+    <header class="card-head"><h2>Super admin accounts</h2></header>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Name</th><th>Last sign-in</th><th>Status</th><th class="actions-col"></th></tr></thead>
+        <tbody>
+          {% for a in admins %}
+          <tr class="{{ 'row-muted' if not a.active }}">
+            <td><strong>{{ a.name }}</strong>{% if a.id == current_user.id %} <span class="badge badge-brand">you</span>{% endif %}<div class="muted small">{{ a.email }}</div></td>
+            <td class="small">{{ a.last_login.strftime('%d %b %Y %H:%M') if a.last_login else 'Never' }}</td>
+            <td>{% if a.active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge badge-grey">Inactive</span>{% endif %}</td>
+            <td class="actions-col">
+              <details class="pw-reset">
+                <summary class="icon-btn" title="Change password">{{ icon('edit', 16) }}</summary>
+                <form method="post" action="{{ url_for('admin.super_admin_password', admin_id=a.id) }}" class="inline-add">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                  <input type="password" name="password" minlength="8" placeholder="New password" autocomplete="new-password" required>
+                  <button class="btn btn-primary" type="submit">Save</button>
+                </form>
+              </details>
+              {% if a.id != current_user.id %}
+              <form method="post" action="{{ url_for('admin.super_admin_toggle', admin_id=a.id) }}" class="inline">
+                <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                <button class="icon-btn" type="submit" title="{{ 'Deactivate' if a.active else 'Activate' }}">{{ icon('eye-off' if a.active else 'eye', 16) }}</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <form class="card" method="post" novalidate data-busy-on-submit autocomplete="off">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <header class="card-head"><h2>Add super admin</h2></header>
+    <p class="muted small">Super admins can register restaurants, manage their logins and open any restaurant.</p>
+    <div class="form-stack">
+      <label class="field {{ 'has-error' if errors.name }}"><span>Name</span><input type="text" name="name" value="{{ form.name or '' }}" maxlength="100" required>
+        {% if errors.name %}<small class="error-text">{{ errors.name }}</small>{% endif %}</label>
+      <label class="field {{ 'has-error' if errors.email }}"><span>Email</span><input type="email" name="email" value="{{ form.email or '' }}" maxlength="150" required autocomplete="off">
+        {% if errors.email %}<small class="error-text">{{ errors.email }}</small>{% endif %}</label>
+      <label class="field {{ 'has-error' if errors.password }}"><span>Password</span><input type="password" name="password" minlength="8" required autocomplete="new-password">
+        {% if errors.password %}<small class="error-text">{{ errors.password }}</small>{% else %}<small class="hint">At least 8 characters.</small>{% endif %}</label>
+      <button class="btn btn-primary" type="submit">{{ icon('plus', 16) }} Add super admin</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

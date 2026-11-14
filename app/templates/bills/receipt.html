@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bill {{ bill.bill_no }} · Kailash Parvatam</title>
+  <link rel="icon" type="image/png" href="{{ asset('img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+</head>
+<body class="receipt-page{% if embedded %} embedded{% endif %}">
+  {% if not embedded %}
+  <div class="receipt-toolbar no-print">
+    <a class="btn btn-ghost" href="{{ url_for('bills.index') }}">{{ icon('arrow-left', 16) }} Bill Detail</a>
+    <a class="btn btn-ghost" href="{{ url_for('bills.create') }}">{{ icon('plus', 16) }} New Bill</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 16) }} Print</button>
+  </div>
+  {% endif %}
+
+  <article class="receipt">
+    <header class="r-head">
+      <img class="r-logo" src="{{ asset('img/kp-logo.png') }}" alt="Kailash Parvatam">
+      <h1>{{ company.name }}</h1>
+      {% if company.address_line %}<p>{{ company.address_line }}</p>{% endif %}
+      {% if company.gst_no %}<p>GSTIN: {{ company.gst_no }}</p>{% endif %}
+      <p class="r-title">TAX INVOICE</p>
+    </header>
+
+    <dl class="r-meta">
+      <div><dt>Bill No</dt><dd>{{ bill.bill_no }}</dd></div>
+      <div><dt>Order</dt><dd><strong>{{ bill.order_type_label|upper }}</strong></dd></div>
+      <div><dt>Date</dt><dd>{{ bill.created.strftime('%d-%m-%Y %I:%M %p') if bill.created else (bill.billing_date.strftime('%d-%m-%Y') if bill.billing_date else '') }}</dd></div>
+      {% if bill.counter_name %}<div><dt>Cashier</dt><dd>{{ bill.counter_name }}</dd></div>{% endif %}
+      {% if bill.customer_name %}<div><dt>Customer</dt><dd>{{ bill.customer_name }}</dd></div>{% endif %}
+      {% if bill.customer_mb_no %}<div><dt>Mobile</dt><dd>{{ bill.customer_mb_no }}</dd></div>{% endif %}
+    </dl>
+
+    <table class="r-items">
+      <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amt</th></tr></thead>
+      <tbody>
+        {% for i in bill['items'] %}
+        <tr><td>{{ i.item_name }}</td><td class="num">{{ i.quantity }}</td><td class="num">{{ i.rate|money }}</td><td class="num">{{ i.amount|money }}</td></tr>
+        {% else %}
+        <tr><td colspan="4" class="center">No items</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="r-totals">
+      <div><span>Subtotal ({{ bill.total_quantity }} items)</span><span>{{ bill.subtotal|money }}</span></div>
+      <div><span>CGST</span><span>{{ bill.cgst }}</span></div>
+      <div><span>SGST</span><span>{{ bill.sgst }}</span></div>
+      {% if bill.service_cost and bill.service_cost|float > 0 %}<div><span>Service charge</span><span>{{ bill.service_cost|money }}</span></div>{% endif %}
+      {% if bill.container_charges and bill.container_charges|float > 0 %}<div><span>Container charges</span><span>{{ bill.container_charges|money }}</span></div>{% endif %}
+      <div class="r-grand"><span>Grand Total</span><span>₹{{ bill.total|money }}</span></div>
+      {% if bill.payment_mode %}<div><span>Paid by</span><span>{{ bill.payment_mode }}</span></div>{% endif %}
+    </div>
+
+    <footer class="r-foot">
+      <p>Thank you! Visit again.</p>
+    </footer>
+  </article>
+
+  {% if auto_print %}
+  <script>window.addEventListener("load", function () { setTimeout(function () { window.print(); }, 150); });</script>
+  {% endif %}
+</body>
+</html>

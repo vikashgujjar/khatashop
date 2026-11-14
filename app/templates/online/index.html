@@ -1,0 +1,100 @@
+{% extends "layouts/base.html" %}
+{% block title %}Order Detail{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Online Orders</span>{% endblock %}
+
+{% block content %}
+<div class="card oo-filter">
+  <form class="toolbar wrap" method="get">
+    <label class="search grow">{{ icon('search', 16) }}<input type="search" name="q" value="{{ q }}" placeholder="Order no, customer or mobile" aria-label="Search"></label>
+    <select name="status" aria-label="Status" data-autosubmit><option value="">All statuses</option>
+      {% for k, v in statuses.items() %}<option value="{{ k }}" {% if status == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    <label class="date-field" title="From">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ start.isoformat() }}" aria-label="From"></label>
+    <label class="date-field" title="To">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ end.isoformat() }}" aria-label="To"></label>
+    <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Filter</button>
+    <span class="chip chip-brand">{{ icon('cart', 14) }} Total Orders: {{ data.count }}</span>
+    <span class="chip">Overall Orders: {{ "{:,}".format(data.overall) }}</span>
+  </form>
+</div>
+
+{% if data.vendor is none %}
+  <div class="card empty">{{ icon('truck', 30) }}<p>This restaurant is not linked to the customer app. Set <code>online_orders.vendor_by_company</code> in db_config.json.</p></div>
+{% elif not data.orders %}
+  <div class="card empty">{{ icon('truck', 30) }}<p>No online orders between {{ start.strftime('%d %b') }} and {{ end.strftime('%d %b %Y') }}.</p></div>
+{% else %}
+<div class="oo-grid">
+  {% for o in data.orders %}
+  <article class="oo-card" data-order="{{ o.id }}">
+    <header class="oo-head">
+      <span class="muted small">Order #{{ o.id }}</span>
+      <span class="oo-status st-{{ o.status_key }}" data-status-badge>{{ o.status_label }}{% if o.status_time %} · {{ o.status_time }}{% endif %}</span>
+    </header>
+    <h3>{{ o.customer_name or 'Customer' }}</h3>
+    <ul class="oo-meta">
+      {% if o.address %}<li>{{ icon('external', 13) }} {{ o.address }}</li>{% endif %}
+      {% if o.mobile %}<li>{{ icon('phone', 13) }} <a href="tel:{{ o.mobile }}">{{ o.mobile }}</a></li>{% endif %}
+      <li>{{ icon('truck', 13) }} Driver: <span data-driver-name>{{ o.driver_name or 'Not assigned' }}</span></li>
+      <li>{{ icon('calendar', 13) }} Ordered: {{ o.created_at.strftime('%b %d, %Y %H:%M') if o.created_at else '' }}</li>
+    </ul>
+    <div class="oo-flags">
+      <button type="button" class="oo-flag {{ 'on' if o.is_confirmed else '' }}" data-toggle="confirmed">{{ 'Confirmed' if o.is_confirmed else 'Not Confirmed' }}</button>
+      <button type="button" class="oo-flag {{ 'on' if o.isReady else '' }}" data-toggle="ready">{{ 'Ready' if o.isReady else 'Not Ready' }}</button>
+      <span class="badge {{ 'badge-green' if o.payment_status == 1 else 'badge-brand' }}">Payment: {{ o.payment_label }}{% if o.paid_method %} ({{ o.paid_method }}){% endif %}</span>
+    </div>
+    <div class="oo-items">
+      {% for i in o['lines'] %}
+      <div class="oo-item"><div><strong>{{ i.item_name }}</strong><small>Rate: ₹{{ i.rate|money }} | GST: {{ '%g'|format(i.item_gst|float) }}%</small></div>
+        <div class="num"><span>Qty: {{ i.quantity }}</span><small>₹{{ i.total|money }}</small></div></div>
+      {% endfor %}
+    </div>
+    <dl class="oo-totals">
+      <div><dt>{{ o['lines']|length }} item{{ '' if o['lines']|length == 1 else 's' }} · Subtotal</dt><dd>₹{{ o.total|money }}</dd></div>
+      {% if o.discount and o.discount|float > 0 %}<div class="disc"><dt>Discount</dt><dd>-₹{{ o.discount|money }}</dd></div>{% endif %}
+      <div><dt>Tax</dt><dd>+₹{{ o.tax|money }}</dd></div>
+      <div><dt>Delivery charges</dt><dd>+₹{{ (o.delivery_charge or 0)|money }}</dd></div>
+      {% if o.container_charges and o.container_charges|float > 0 %}<div><dt>Container charges</dt><dd>+₹{{ o.container_charges|money }}</dd></div>{% endif %}
+      <div class="final"><dt>Final Amount</dt><dd>₹{{ o.grand_total|money }}</dd></div>
+    </dl>
+    <div class="oo-actions">
+      <label><span class="muted small">Change status</span>
+        <select data-field="status">{% for k in settable %}<option value="{{ k }}" {% if o.status_key == k %}selected{% endif %}>{{ statuses[k] }}</option>{% endfor %}
+          {% if o.status_key not in settable %}<option value="" selected disabled>{{ o.status_label }}</option>{% endif %}</select></label>
+      <label><span class="muted small">Assign driver</span>
+        <select data-field="driver_id"><option value="">Not assigned</option>
+          {% for d in drivers %}<option value="{{ d.id }}" {% if o.driver_id == d.id %}selected{% endif %}>{{ d.name }} - {{ d.mobile }}</option>{% endfor %}</select></label>
+    </div>
+    <a class="btn btn-primary btn-block" href="{{ url_for('online.print_order', order_id=o.id, print=1) }}" target="_blank">{{ icon('printer', 15) }} Print Order</a>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+  const base = "{{ url_for('online.update', order_id=0) }}".replace(/\/0\/update$/, "/");
+  async function send(card, payload) {
+    try {
+      const res = await fetch(base + card.dataset.order + "/update", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-Token": KS.csrf }, body: JSON.stringify(payload) });
+      const body = await res.json();
+      if (!body.ok) throw new Error(body.error || "Could not update the order.");
+      const o = body.order;
+      const badge = card.querySelector("[data-status-badge]");
+      badge.className = "oo-status st-" + o.status_key;
+      badge.textContent = o.status_label + (o.status_time ? " · " + o.status_time : "");
+      card.querySelector("[data-driver-name]").textContent = o.driver_name || "Not assigned";
+      const c = card.querySelector('[data-toggle="confirmed"]'), r = card.querySelector('[data-toggle="ready"]');
+      c.classList.toggle("on", !!o.is_confirmed); c.textContent = o.is_confirmed ? "Confirmed" : "Not Confirmed";
+      r.classList.toggle("on", !!o.isReady); r.textContent = o.isReady ? "Ready" : "Not Ready";
+      KS.toast("Order #" + o.id + " updated.", "success");
+    } catch (err) { KS.toast(err.message, "error"); }
+  }
+  document.querySelectorAll(".oo-card").forEach((card) => {
+    card.querySelectorAll("select[data-field]").forEach((s) => s.addEventListener("change", () => send(card, { [s.dataset.field]: s.value })));
+    card.querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => send(card, { [b.dataset.toggle]: !b.classList.contains("on") })));
+  });
+})();
+</script>
+{% endblock %}

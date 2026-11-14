@@ -1,0 +1,59 @@
+{% extends "layouts/base.html" %}
+{% block title %}Reports{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Reports</span>{% endblock %}
+{% block actions %}
+  <a class="btn btn-success" href="{{ url_for('reports.export', type=report.kind, date_from=start.isoformat(), date_to=end.isoformat(), source=report.source or None) }}">{{ icon('excel', 16) }} Export Excel</a>
+{% endblock %}
+
+{% block content %}
+<div class="report-tabs" role="tablist">
+  {% for key, label in reports.items() %}
+    <a class="chip{% if key == report.kind %} active{% endif %}" role="tab" aria-selected="{{ 'true' if key == report.kind else 'false' }}"
+       href="{{ url_for('reports.index', type=key, date_from=start.isoformat(), date_to=end.isoformat()) }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <form class="toolbar" method="get">
+    <input type="hidden" name="type" value="{{ report.kind }}">
+    <label class="date-field" title="From date">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ start.isoformat() }}" aria-label="From date"></label>
+    <span class="muted">to</span>
+    <label class="date-field" title="To date">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ end.isoformat() }}" aria-label="To date"></label>
+    {% if report.has_source %}
+    <select name="source" aria-label="Orders" data-autosubmit>
+      {% for k, v in sources.items() %}<option value="{{ k }}" {% if report.source == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <button class="btn btn-primary" type="submit">{{ icon('refresh', 16) }} Show report</button>
+    <span class="toolbar-spacer"></span>
+    <span class="muted small">{{ report.rows|length }} row{{ '' if report.rows|length == 1 else 's' }}</span>
+  </form>
+  {% if note %}<div class="alert alert-info compact">{{ icon('info', 16) }}<span>{{ note }}</span></div>{% endif %}
+
+  {% if report.rows %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr>{% for key, label, kind in report.columns %}<th class="{{ 'num' if kind != 'text' }}">{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in report.rows %}
+        <tr>
+          {% for key, label, kind in report.columns %}
+            <td class="{{ 'num' if kind != 'text' }}">{% if key == 'source' %}<span class="badge {{ 'badge-rose' if row[key] == 'Online' else 'badge-grey' }}">{{ row[key] }}</span>{% elif kind == 'money' %}{{ row[key]|money }}{% elif kind == 'int' %}{{ "{:,}".format((row[key] or 0)|int) }}{% elif kind == 'qty' %}{{ '%g'|format((row[key] or 0)|float|round(3)) }}{% else %}{{ row[key] if row[key] is not none else '' }}{% endif %}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          {% for key, label, kind in report.columns %}
+            <td class="{{ 'num' if kind != 'text' }}">{% if loop.first %}Total{% elif key in report.totals %}{% if kind == 'money' %}{{ report.totals[key]|money }}{% else %}{{ "{:,}".format(report.totals[key]|int) }}{% endif %}{% endif %}</td>
+          {% endfor %}
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">{{ icon('trend-up', 32) }}<p>No sales between {{ start.strftime('%d %b %Y') }} and {{ end.strftime('%d %b %Y') }}.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

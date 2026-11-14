@@ -1,0 +1,40 @@
+{% extends "layouts/base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-wrap">
+  <section class="auth-brand">
+    <div class="auth-logo-plate">
+      <img src="{{ asset('img/kp-logo.png') }}" alt="Kailash Parvatam - Chaats || Dining" class="auth-logo">
+    </div>
+    <h2>Billing &amp; menu, made simple</h2>
+    <p>Create bills in seconds, keep the menu up to date and see how the day is going, all in one place.</p>
+    <ul class="auth-points">
+      <li>{{ icon('receipt', 16) }} Fast counter billing with GST</li>
+      <li>{{ icon('book', 16) }} Menu, categories and PDF menu</li>
+      <li>{{ icon('grid', 16) }} Live sales dashboard</li>
+    </ul>
+  </section>
+  <section class="auth-side">
+    <div class="auth-card">
+      <img class="auth-emblem" src="{{ asset('img/kp-emblem.png') }}" alt="">
+      <h1>Welcome back</h1>
+      <p class="muted">Sign in with your staff account.</p>
+      {% include "partials/flash.html" %}
+      {% if error %}<div class="alert alert-error" role="alert">{{ icon('alert') }}<span>{{ error }}</span></div>{% endif %}
+      <form method="post" novalidate class="form-stack" data-busy-on-submit>
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <label class="field">
+          <span>Email</span>
+          <input type="email" name="email" value="{{ email }}" autocomplete="username" required autofocus>
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="btn btn-primary btn-lg btn-block" type="submit">Sign in</button>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

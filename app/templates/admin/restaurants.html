@@ -1,0 +1,48 @@
+{% extends "layouts/base.html" %}
+{% block title %}Restaurants{% endblock %}
+{% block crumbs %}<span>Super Admin</span>{% endblock %}
+{% block actions %}
+  <a class="btn btn-primary" href="{{ url_for('admin.restaurant_new') }}">{{ icon('plus', 16) }} Register Restaurant</a>
+{% endblock %}
+
+{% block content %}
+{% if restaurants %}
+<div class="rest-grid">
+  {% for r in restaurants %}
+  <article class="rest-card{% if r.status != 'open' %} closed{% endif %}">
+    <header>
+      {% if r.logo_url %}<img class="rest-logo" src="{{ r.logo_url }}" alt="">
+      {% else %}<span class="rest-logo rest-initial">{{ r.abbreviation or r.name[:2] }}</span>{% endif %}
+      <div class="rest-name">
+        <strong>{{ r.name }}</strong>
+        <span class="muted small">{{ r.location }}</span>
+      </div>
+      <span class="badge {{ 'badge-green' if r.status == 'open' else 'badge-grey' }}">{{ (r.status or 'not set')|capitalize }}</span>
+    </header>
+    <dl class="rest-stats">
+      <div><dt>Bill prefix</dt><dd>{{ r.abbreviation }}</dd></div>
+      <div><dt>Bills</dt><dd>{{ "{:,}".format(r.bills) }}</dd></div>
+      <div><dt>Menu</dt><dd>{{ r.categories }} cat · {{ r.item_count }} items</dd></div>
+      <div><dt>Staff logins</dt><dd>{{ r.staff }}</dd></div>
+      <div><dt>Last bill</dt><dd>{{ r.last_bill.strftime('%d %b %Y') if r.last_bill else '—' }}</dd></div>
+      <div><dt>Payments</dt><dd>{% if r.payment_modes %}{{ r.payment_modes }} options{% else %}<span class="warn-text">{{ icon('alert', 13) }} none</span>{% endif %}</dd></div>
+    </dl>
+    <div class="module-chips" title="Modules">
+      {% for m in r.modules_on %}<span class="badge badge-green">{{ m }}</span>{% endfor %}
+      {% for m in r.modules_off %}<span class="badge badge-grey off">{{ m }}</span>{% endfor %}
+    </div>
+    <footer class="btn-row">
+      <form method="post" action="{{ url_for('admin.restaurant_open', company_id=r.id) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn btn-primary" type="submit">{{ icon('external', 16) }} Open</button>
+      </form>
+      <a class="btn btn-ghost" href="{{ url_for('admin.restaurant', company_id=r.id) }}">{{ icon('edit', 16) }} Manage</a>
+    </footer>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="card empty">{{ icon('layers', 32) }}<p>No restaurants registered yet.</p>
+    <a class="btn btn-primary" href="{{ url_for('admin.restaurant_new') }}">{{ icon('plus', 16) }} Register Restaurant</a></div>
+{% endif %}
+{% endblock %}

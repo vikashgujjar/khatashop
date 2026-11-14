@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Kailash Parvatam{% endblock %} · Kailash Parvatam</title>
+  <link rel="icon" type="image/png" href="{{ asset('img/favicon.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<script>
+  /* Apply remembered layout choices before the page paints (no flicker). */
+  try {
+    if (localStorage.getItem("ks_sidebar") === "collapsed") document.body.classList.add("sidebar-collapsed");
+    if (localStorage.getItem("ks_cats") === "hidden") document.body.classList.add("cats-hidden");
+  } catch (e) { /* storage unavailable: use defaults */ }
+</script>
+<div class="accent-bar" aria-hidden="true"></div>
+{% block body %}
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ url_for('dashboard.index') if current_user.company_id else url_for('admin.restaurants') }}" title="Home">
+      <img class="brand-full" src="{{ brand_logo() }}" alt="{{ current_user.company_name or 'Kailash Parvatam' }}">
+      <img class="brand-mini" src="{{ asset('img/kp-emblem.png') }}" alt="">
+    </a>
+    {% set nav = [] %}
+    {% if is_super %}
+      {% set nav = [("Super Admin", [
+        {"url": url_for('admin.restaurants'), "label": "Restaurants", "icon": "layers", "active": active_endpoint.startswith('admin.restaurant')},
+        {"url": url_for('admin.super_admins'), "label": "Super Admins", "icon": "user", "active": active_endpoint.startswith('admin.super_admin')}])] %}
+    {% endif %}
+    {% set nav = nav + outlet_nav() %}
+    {% if is_super and current_user.company_id %}
+    <div class="outlet-banner">
+      <span class="small">Working in</span>
+      <strong>{{ current_user.company_name }}</strong>
+      <form method="post" action="{{ url_for('admin.exit_outlet') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="link small" type="submit">{{ icon('arrow-left', 12) }} Exit to all restaurants</button>
+      </form>
+    </div>
+    {% endif %}
+    <nav class="nav">
+      {% for group, links in nav %}
+        <div class="nav-group">{{ group }}</div>
+        {% for link in links %}
+          <a class="nav-link{% if link.active %} active{% endif %}" href="{{ link.url }}" title="{{ link.label }}">{{ icon(link.icon) }}<span>{{ link.label }}</span></a>
+        {% endfor %}
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip" title="{{ current_user.email }}">
+        <span class="avatar">{{ (current_user.name or '?')[:1]|upper }}</span>
+        <span class="user-meta"><strong>{{ current_user.name }}</strong><small>{{ 'Super admin' if is_super else (role_name or current_user.email) }}</small></span>
+      </div>
+      <form method="post" action="{{ url_for('auth.logout') }}" class="signout-form">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="icon-btn signout-btn" type="submit" title="Sign out" aria-label="Sign out">{{ icon('logout', 18) }}</button>
+      </form>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" data-close-sidebar></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-toggle" type="button" data-toggle-sidebar title="Show / hide menu" aria-label="Show or hide the menu">{{ icon('menu') }}</button>
+      <div class="topbar-title">
+        <h1>{% block heading %}{{ self.title() }}{% endblock %}</h1>
+        <div class="crumbs">{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a>{% endblock %}</div>
+      </div>
+      <div class="topbar-actions">{% block actions %}{% endblock %}</div>
+    </header>
+    <main class="content">
+      {% include "partials/flash.html" %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}
+<div class="toast-stack" id="toasts" aria-live="polite"></div>
+<script src="{{ asset('js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

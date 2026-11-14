@@ -1,0 +1,25 @@
+{% extends "layouts/base.html" %}
+{% block title %}Attendance{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Attendance</span>{% endblock %}
+{% block actions %}<a class="btn btn-success" href="{{ url_for('attendance.index', month=month.strftime('%Y-%m'), export=1) }}">{{ icon('excel', 16) }} Export Excel</a>{% endblock %}
+{% block content %}
+<div class="card">
+  <form class="toolbar" method="get">
+    <label class="date-field">{{ icon('calendar', 14) }}<input type="month" name="month" value="{{ month.strftime('%Y-%m') }}" aria-label="Month"></label>
+    <button class="btn btn-primary" type="submit">{{ icon('refresh', 16) }} Show</button>
+    <span class="toolbar-spacer"></span><span class="muted small">From the biometric punches. Staff need an employee ID on their login.</span>
+  </form>
+  <div class="att-legend"><span><i style="background: var(--brand-50); border: 1px solid var(--brand-100)"></i>Present (first-last punch)</span>
+    {% for s in statuses.values() %}<span><i style="background: {{ s.status_color }}"></i>{{ s.status_name }}</span>{% endfor %}</div>
+  {% if rows %}
+  <div class="att-wrap"><table class="att">
+    <thead><tr><th>Employee</th>{% for d in range(1, days + 1) %}<th>{{ d }}</th>{% endfor %}<th>Present</th></tr></thead>
+    <tbody>{% for r in rows %}<tr>
+      <td class="name">{{ r.name }}<div class="muted small">#{{ r.employee_id }} · {{ r.role }}</div></td>
+      {% for c in r.cells %}<td class="{{ c.cls }}" title="{{ c.title }}" {% if c.color %}style="color: {{ c.color }}; font-weight: 700"{% endif %}>{{ c.text }}</td>{% endfor %}
+      <td><strong>{{ r.present }}</strong></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty">{{ icon('calendar', 30) }}<p>No staff with an employee ID in this restaurant.</p></div>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "layouts/base.html" %}
+{% block title %}Manage Tables{% endblock %}
+{% block crumbs %}<a href="{{ url_for('tables.index') }}">Table View</a> / <span>Manage</span>{% endblock %}
+{% block actions %}<a class="btn btn-ghost" href="{{ url_for('tables.index') }}">{{ icon('grid', 16) }} Table View</a>{% endblock %}
+
+{% block content %}
+<div class="grid-1-2">
+  <form class="card" method="post" novalidate data-busy-on-submit>
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <header class="card-head"><h2>Add tables</h2></header>
+    <div class="form-stack">
+      <label class="field {{ 'has-error' if errors.area }}">
+        <span>Area</span>
+        <input type="text" name="area" value="{{ form.area or '' }}" maxlength="40" list="area-list" placeholder="e.g. AC, Garden, Rooftop">
+        <datalist id="area-list">{% for a in areas %}<option value="{{ a }}">{% endfor %}</datalist>
+        {% if errors.area %}<small class="error-text">{{ errors.area }}</small>{% else %}<small class="hint">Tables are grouped by area on the Table View. Empty means "Other".</small>{% endif %}
+      </label>
+      <label class="field {{ 'has-error' if errors.names }}">
+        <span>Table names <em>*</em></span>
+        <input type="text" name="names" value="{{ form.names or '' }}" required placeholder="AC1-AC6   or   1-20   or   T1, T2, Bar">
+        {% if errors.names %}<small class="error-text">{{ errors.names }}</small>{% else %}<small class="hint">Use a range like <code>AC1-AC6</code> or <code>1-20</code>, or list names separated by commas.</small>{% endif %}
+      </label>
+      <button class="btn btn-primary" type="submit">{{ icon('plus', 16) }} Add tables</button>
+    </div>
+  </form>
+
+  <article class="card">
+    <header class="card-head"><h2>Tables</h2><span class="muted small">{{ tables|length }} total</span></header>
+    {% if tables %}
+    <div class="table-wrap">
+      <table class="table compact">
+        <thead><tr><th>Name</th><th>Area</th><th>Status</th><th class="actions-col"></th></tr></thead>
+        <tbody>
+        {% for t in tables %}
+          <tr class="{{ 'row-muted' if not t.active }}">
+            <td colspan="3">
+              <form method="post" action="{{ url_for('tables.manage_update', table_id=t.id) }}" class="tm-row">
+                <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                <input type="text" name="name" value="{{ t.name }}" maxlength="20" aria-label="Table name" required>
+                <input type="text" name="area" value="{{ t.area }}" maxlength="40" list="area-list" aria-label="Area">
+                <select name="active" aria-label="Status">
+                  <option value="1" {% if t.active %}selected{% endif %}>On</option>
+                  <option value="0" {% if not t.active %}selected{% endif %}>Off</option>
+                </select>
+                <button class="btn btn-ghost" type="submit">Save</button>
+              </form>
+            </td>
+            <td class="actions-col">
+              <form method="post" action="{{ url_for('tables.manage_delete', table_id=t.id) }}" class="inline" data-confirm="Delete table {{ t.name }}?">
+                <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                <button class="icon-btn danger" type="submit" title="Delete">{{ icon('trash', 15) }}</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty">{{ icon('grid', 28) }}<p>No tables yet. Add some on the left.</p></div>
+    {% endif %}
+  </article>
+</div>
+{% endblock %}

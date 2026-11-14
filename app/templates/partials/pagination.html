@@ -1,0 +1,17 @@
+{% macro pagination(pager, noun="records") %}
+<div class="pager">
+  <div class="pager-info">
+    {% if pager.total %}Showing <strong>{{ pager.first_item }}–{{ pager.last_item }}</strong> of <strong>{{ "{:,}".format(pager.total) }}</strong> {{ noun }}{% else %}No {{ noun }}{% endif %}
+  </div>
+  {% if pager.pages > 1 %}
+  <nav class="pager-links" aria-label="Pages">
+    <a class="page-btn{% if pager.page == 1 %} disabled{% endif %}" href="{{ url_with(page=pager.page - 1) }}" aria-label="Previous">{{ icon('chevron-left', 16) }}</a>
+    {% for p in pager.window() %}
+      {% if p is none %}<span class="page-gap">…</span>
+      {% else %}<a class="page-btn{% if p == pager.page %} current{% endif %}" href="{{ url_with(page=p) }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    <a class="page-btn{% if pager.page == pager.pages %} disabled{% endif %}" href="{{ url_with(page=pager.page + 1) }}" aria-label="Next">{{ icon('chevron-right', 16) }}</a>
+  </nav>
+  {% endif %}
+</div>
+{% endmacro %}

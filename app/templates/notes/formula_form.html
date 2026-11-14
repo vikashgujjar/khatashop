@@ -1,0 +1,15 @@
+{% extends "layouts/base.html" %}
+{% block title %}Recipe: {{ item.name }}{% endblock %}
+{% block crumbs %}<a href="{{ url_for('formula.index') }}">Consumption Formula</a> / <span>{{ item.name }}</span>{% endblock %}
+{% block content %}
+<form class="card" method="post" novalidate data-busy-on-submit>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <p class="muted">Ingredients used for <strong>one</strong> portion of {{ item.name }}. Remove all lines to delete the recipe.</p>
+  {% if not ingredients %}<div class="alert alert-warning compact">{{ icon('alert', 15) }}<span>No ingredients yet. <a href="{{ url_for('crud.create', resource='ingredients') }}">Add ingredients</a> first.</span></div>{% endif %}
+  {% with priced=false, qty_step='0.001' %}{% include "notes/_lines.html" %}{% endwith %}
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{{ url_for('formula.index') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit">{{ icon('check', 16) }} Save recipe</button>
+  </div>
+</form>
+{% endblock %}

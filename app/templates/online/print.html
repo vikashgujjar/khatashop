@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order #{{ o.id }}</title><link rel="stylesheet" href="{{ asset('css/app.css') }}"></head>
+<body class="receipt-page">
+  <div class="receipt-toolbar no-print"><button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 16) }} Print</button></div>
+  <article class="receipt">
+    <header class="r-head"><h1>{{ company.name }}</h1>{% if company.gst_no %}<p>GSTIN: {{ company.gst_no }}</p>{% endif %}<p class="r-title">ONLINE ORDER #{{ o.id }}</p></header>
+    <dl class="r-meta">
+      <div><dt>Date</dt><dd>{{ o.created_at.strftime('%d-%m-%Y %I:%M %p') if o.created_at else '' }}</dd></div>
+      <div><dt>Customer</dt><dd>{{ o.customer_name or '' }}</dd></div>
+      {% if o.mobile %}<div><dt>Mobile</dt><dd>{{ o.mobile }}</dd></div>{% endif %}
+      <div><dt>Status</dt><dd>{{ o.status_label }}</dd></div>
+      <div><dt>Payment</dt><dd>{{ o.payment_label }}</dd></div>
+      {% if o.driver_name %}<div><dt>Driver</dt><dd>{{ o.driver_name }}</dd></div>{% endif %}
+    </dl>
+    {% if o.address %}<p class="small">{{ o.address }}</p>{% endif %}
+    <table class="r-items"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amt</th></tr></thead>
+      <tbody>{% for i in o['lines'] %}<tr><td>{{ i.item_name }}</td><td class="num">{{ i.quantity }}</td><td class="num">{{ i.rate|money }}</td><td class="num">{{ i.total|money }}</td></tr>{% endfor %}</tbody></table>
+    <div class="r-totals">
+      <div><span>Subtotal</span><span>{{ o.total|money }}</span></div>
+      {% if o.discount and o.discount|float > 0 %}<div><span>Discount</span><span>-{{ o.discount|money }}</span></div>{% endif %}
+      <div><span>Tax</span><span>{{ o.tax|money }}</span></div>
+      <div><span>Delivery</span><span>{{ (o.delivery_charge or 0)|money }}</span></div>
+      <div class="r-grand"><span>Final Amount</span><span>₹{{ o.grand_total|money }}</span></div>
+    </div>
+    <footer class="r-foot">Thank you!</footer>
+  </article>
+  {% if auto_print %}<script>window.addEventListener("load", () => setTimeout(() => window.print(), 150));</script>{% endif %}
+</body></html>

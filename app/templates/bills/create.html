@@ -1,0 +1,132 @@
+{% extends "layouts/base.html" %}
+{% block title %}New Bill{% endblock %}
+{% block body_class %}pos-page{% endblock %}
+{% block body %}
+<div class="pos" id="pos" data-mode="quick" data-initial-order="{{ initial_order }}"
+     data-save-url="{{ url_for('bills.store') }}"
+     data-receipt-url="{{ url_for('bills.show', bill_id=0) }}"
+     data-done-url="{{ url_for('tables.index') }}">
+
+  <header class="pos-top">
+    <a class="icon-btn" href="{{ url_for('tables.index') }}" title="Back to Table View" aria-label="Back to Table View">{{ icon('arrow-left', 18) }}</a>
+    <button class="icon-btn" type="button" data-toggle-cats title="Show / hide categories" aria-label="Show or hide categories" aria-pressed="false">{{ icon('menu', 18) }}</button>
+    <img class="pos-logo" src="{{ brand_logo() }}" alt="{{ company.name }}">
+    <div class="pos-title">
+      <h1>New Bill</h1>
+      <span>{{ company.name }}</span>
+    </div>
+    <label class="search pos-search">
+      {{ icon('search', 15) }}
+      <input type="search" id="pos-search" placeholder="Search items…" autocomplete="off" aria-label="Search items">
+      <kbd>/</kbd>
+    </label>
+    <div class="pos-meta">
+      <span class="pos-billno" title="Next bill number">#<span id="bill-no">{{ next_bill_no }}</span></span>
+      <span class="pos-clock" title="Date and time">{{ icon('calendar', 13) }} <span id="clock">{{ started.strftime('%d-%m-%Y %H:%M') }}</span></span>
+    </div>
+  </header>
+
+  <aside class="pos-cats" id="pos-cats" aria-label="Categories">
+    <button type="button" class="cat active" data-cat="all">
+      <span class="cat-img cat-all">{{ icon('grid', 15) }}</span><span class="cat-name">All Items</span>
+    </button>
+    {% for c in categories %}
+    <button type="button" class="cat" data-cat="{{ c.id }}" title="{{ c.name }}">
+      {% if c.image %}<img class="cat-img" src="{{ c.image }}" alt="" loading="lazy" data-letter="{{ c.name[:1]|upper }}" onerror="this.replaceWith(Object.assign(document.createElement('span'), {className: 'cat-img', textContent: this.dataset.letter}))">{% else %}<span class="cat-img">{{ c.name[:1]|upper }}</span>{% endif %}
+      <span class="cat-name">{{ c.name|title }}</span>
+      <span class="cat-count">{{ c['items']|length }}</span>
+    </button>
+    {% endfor %}
+  </aside>
+
+  <section class="pos-items" aria-label="Menu items">
+    <div class="pos-items-head">
+      <h2 id="items-title">All Items</h2><span class="muted small" id="items-count"></span>
+    </div>
+    <div class="item-grid" id="item-grid"></div>
+    <div class="empty" id="items-empty" hidden>{{ icon('search', 26) }}<p>No items found.</p></div>
+    {% if not categories %}
+      <div class="empty">{{ icon('book', 30) }}<p>No menu items are available for billing.</p>
+        <a class="btn btn-primary" href="{{ url_for('menu.create') }}">{{ icon('plus', 16) }} Add menu items</a></div>
+    {% endif %}
+  </section>
+
+  <section class="pos-cart" aria-label="Current bill">
+    <div class="pos-flash">{% include "partials/flash.html" %}</div>
+
+    <div class="cart-top">
+      <div class="seg order-types" role="radiogroup" aria-label="Order type">
+        <button type="button" class="active" data-order="dine_in" role="radio" aria-checked="true">{{ icon('utensils', 15) }} Dine-in</button>
+        <button type="button" data-order="pickup" role="radio" aria-checked="false">{{ icon('bag', 15) }} Pickup</button>
+        <button type="button" data-order="delivery" role="radio" aria-checked="false">{{ icon('truck', 15) }} Delivery</button>
+      </div>
+
+      <div class="cart-customer">
+        <label class="input-icon">{{ icon('user', 14) }}<input type="text" id="customer-name" placeholder="Customer name" maxlength="100" autocomplete="off"></label>
+        <label class="input-icon">{{ icon('phone', 14) }}<input type="tel" id="customer-phone" placeholder="Phone" maxlength="15" inputmode="tel" autocomplete="off"></label>
+      </div>
+
+      {% if payment_modes %}
+      <div class="pay-row">
+        <span class="pay-label">Pay by</span>
+        <div class="seg pay-modes" role="radiogroup" aria-label="Payment mode">
+          {% for m in payment_modes %}
+            <button type="button" class="pay{% if loop.first %} active{% endif %}" data-pay="{{ m.id }}" role="radio" aria-checked="{{ 'true' if loop.first else 'false' }}">{{ m.name }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+        <div class="setup-pay">
+          <div class="alert alert-warning compact">{{ icon('alert', 15) }}<span>No payment options yet, so bills cannot be saved.</span></div>
+          {% if can_manage_payments %}
+          <form method="post" action="{{ url_for('bills.setup_payment_options') }}" data-busy-on-submit>
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn btn-sun btn-block" type="submit">{{ icon('check', 15) }} Set up Cash, Card &amp; UPI</button>
+          </form>
+          {% else %}
+            <p class="muted small center">Ask your outlet admin to set up payment options.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if service_modes %}
+      <label class="pay-row">
+        <span class="pay-label">Service</span>
+        <select id="service-mode" class="mini-select">
+          <option value="" data-percent="0">None</option>
+          {% for s in service_modes %}<option value="{{ s.id }}" data-percent="{{ s.percent }}">{{ s.name }}{% if s.percent %} ({{ '%g'|format(s.percent) }}%){% endif %}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </div>
+
+    <div class="cart-head"><span>Items <span class="count-pill" id="cart-count">0</span></span><span>Qty</span><span>Amount</span></div>
+    <div class="cart-lines" id="cart-lines">
+      <div class="cart-empty" id="cart-empty">{{ icon('cart', 30) }}<p><strong>No items yet</strong><br>Tap an item to add it</p></div>
+    </div>
+
+    <div class="cart-totals">
+      <div class="tot-row"><span>Subtotal · <span id="t-count">0 items</span></span><span id="t-subtotal">₹0.00</span></div>
+      <div class="tot-row"><span>GST <small class="muted">(CGST <span id="t-cgst">₹0.00</span> + SGST <span id="t-sgst">₹0.00</span>)</small></span><span id="t-gst">₹0.00</span></div>
+      <div class="tot-row" id="row-service" hidden><span>Service charge</span><span id="t-service">₹0.00</span></div>
+      <div class="tot-row container-row" id="row-container" hidden>
+        <label class="switch" title="Container charges"><input type="checkbox" id="container-on"><span class="slider"></span></label>
+        <span>Container</span>
+        <div class="container-ctrl" id="container-ctrl">
+          <div class="mini-seg">
+            <button type="button" class="active" data-cmode="percent">%</button>
+            <button type="button" data-cmode="amount">₹</button>
+          </div>
+          <input type="number" id="container-value" value="10" min="0" step="0.5" aria-label="Container charge value">
+        </div>
+        <span id="t-container">₹0.00</span>
+      </div>
+      <div class="grand"><span>Grand Total</span><strong id="t-grand">₹0.00</strong></div>
+      <button type="button" class="btn btn-primary btn-block save-btn" id="save-bill" disabled>{{ icon('printer', 17) }} Save &amp; Print <kbd>Ctrl ↵</kbd></button>
+      <p class="error-text center" id="cart-error" hidden></p>
+    </div>
+  </section>
+</div>
+<script type="application/json" id="menu-data">{{ categories|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ asset('js/pos_menu.js') }}"></script><script src="{{ asset('js/billing.js') }}"></script>{% endblock %}

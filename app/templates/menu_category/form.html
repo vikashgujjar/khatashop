@@ -1,0 +1,47 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit Category' if category else 'Add Category' }}{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <a href="{{ url_for('menu_category.index') }}">Menu Category</a> / <span>{{ category.name if category else 'New' }}</span>{% endblock %}
+
+{% block content %}
+<form class="card form-card" method="post" enctype="multipart/form-data" novalidate data-busy-on-submit>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <label class="field span-2 {{ 'has-error' if errors.name }}">
+      <span>Category name <em>*</em></span>
+      <input type="text" name="name" value="{{ form.name }}" maxlength="150" required autofocus>
+      {% if errors.name %}<small class="error-text">{{ errors.name }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.sort_order }}">
+      <span>Display order</span>
+      <input type="number" name="sort_order" value="{{ form.sort_order }}" min="0" max="99999" step="1">
+      {% if errors.sort_order %}<small class="error-text">{{ errors.sort_order }}</small>{% else %}<small class="hint">Lower numbers show first on the billing screen.</small>{% endif %}
+    </label>
+    <label class="field">
+      <span>Status</span>
+      <select name="active">
+        <option value="1" {% if form.active|string == '1' %}selected{% endif %}>Show</option>
+        <option value="0" {% if form.active|string == '0' %}selected{% endif %}>Hide</option>
+      </select>
+      <small class="hint">Hiding a category also hides all its items.</small>
+    </label>
+    <div class="field span-2 {{ 'has-error' if errors.image }}">
+      <span>Photo</span>
+      <div class="image-picker">
+        <div class="image-preview" data-preview-for="image">
+          {% if image_url %}<img src="{{ image_url }}" alt="Current photo">{% else %}{{ icon('image', 28) }}{% endif %}
+        </div>
+        <div>
+          <input type="file" id="image" name="image" accept="image/*" data-image-input>
+          <small class="hint">JPG, PNG or WEBP. Large photos are resized automatically.</small>
+          {% if image_url %}<label class="check"><input type="checkbox" name="remove_image" value="1"> Remove current photo</label>{% endif %}
+          {% if errors.image %}<small class="error-text">{{ errors.image }}</small>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{{ url_for('menu_category.index') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit">{{ icon('check', 16) }} {{ 'Save changes' if category else 'Add category' }}</button>
+  </div>
+</form>
+{% endblock %}

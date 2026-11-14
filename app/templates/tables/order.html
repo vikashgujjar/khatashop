@@ -1,0 +1,119 @@
+{% extends "layouts/base.html" %}
+{% block title %}Table {{ table.name }}{% endblock %}
+{% block body_class %}pos-page{% endblock %}
+{% block body %}
+<div class="pos" id="pos" data-mode="table" data-can-bill="{{ '1' if can_bill else '0' }}"
+     data-api="{{ url_for('tables.state_json', table_id=table.id) }}"
+     data-tables-url="{{ url_for('tables.index') }}"
+     data-receipt-url="{{ url_for('bills.show', bill_id=0) }}">
+
+  <header class="pos-top">
+    <a class="icon-btn" href="{{ url_for('tables.index') }}" title="Back to Table View" aria-label="Back to Table View">{{ icon('arrow-left', 18) }}</a>
+    <button class="icon-btn" type="button" data-toggle-cats title="Show / hide categories" aria-label="Show or hide categories" aria-pressed="false">{{ icon('menu', 18) }}</button>
+    <img class="pos-logo" src="{{ brand_logo() }}" alt="{{ company.name }}">
+    <div class="pos-title">
+      <h1>Table {{ table.name }}</h1>
+      <span>{{ table.area }} · {{ company.name }}</span>
+    </div>
+    <label class="search pos-search">
+      {{ icon('search', 15) }}
+      <input type="search" id="pos-search" placeholder="Search items…" autocomplete="off" aria-label="Search items">
+      <kbd>/</kbd>
+    </label>
+    <div class="pos-meta">
+      <span class="pos-clock" title="Date and time">{{ icon('calendar', 13) }} <span id="clock">{{ started.strftime('%d-%m-%Y %H:%M') }}</span></span>
+    </div>
+  </header>
+
+  <aside class="pos-cats" id="pos-cats" aria-label="Categories">
+    <button type="button" class="cat active" data-cat="all">
+      <span class="cat-img cat-all">{{ icon('grid', 15) }}</span><span class="cat-name">All Items</span>
+    </button>
+    {% for c in categories %}
+    <button type="button" class="cat" data-cat="{{ c.id }}" title="{{ c.name }}">
+      {% if c.image %}<img class="cat-img" src="{{ c.image }}" alt="" loading="lazy" data-letter="{{ c.name[:1]|upper }}" onerror="this.replaceWith(Object.assign(document.createElement('span'), {className: 'cat-img', textContent: this.dataset.letter}))">{% else %}<span class="cat-img">{{ c.name[:1]|upper }}</span>{% endif %}
+      <span class="cat-name">{{ c.name|title }}</span>
+      <span class="cat-count">{{ c['items']|length }}</span>
+    </button>
+    {% endfor %}
+  </aside>
+
+  <section class="pos-items" aria-label="Menu items">
+    <div class="pos-items-head">
+      <h2 id="items-title">All Items</h2><span class="muted small" id="items-count"></span>
+    </div>
+    <div class="item-grid" id="item-grid"></div>
+    <div class="empty" id="items-empty" hidden>{{ icon('search', 26) }}<p>No items found.</p></div>
+  </section>
+
+  <section class="pos-cart" aria-label="Table order">
+    <div class="cart-top">
+      <div class="to-head">
+        <span class="to-status" id="to-status">Blank</span>
+        <span class="muted small" id="to-since"></span>
+        <span class="muted small" id="to-billno"></span>
+        <span class="to-tools">
+          <button type="button" class="icon-btn" id="to-move" title="Move order to another table">{{ icon('external', 16) }}</button>
+          {% if can_manage %}<button type="button" class="icon-btn danger" id="to-cancel" title="Cancel this order">{{ icon('trash', 16) }}</button>{% endif %}
+        </span>
+      </div>
+      <div class="move-box" id="move-box" hidden>
+        <select id="move-to" class="mini-select" aria-label="Move to table">
+          <option value="">Move to table…</option>
+          {% for t in all_tables if t.id != table.id %}<option value="{{ t.id }}">{{ t.area }} · {{ t.name }}</option>{% endfor %}
+        </select>
+        <button type="button" class="btn btn-primary" id="move-go">Move</button>
+      </div>
+      <div class="cart-customer">
+        <label class="input-icon">{{ icon('user', 14) }}<input type="text" id="customer-name" placeholder="Customer name" maxlength="100" autocomplete="off"></label>
+        <label class="input-icon">{{ icon('phone', 14) }}<input type="tel" id="customer-phone" placeholder="Phone" maxlength="15" inputmode="tel" autocomplete="off"></label>
+      </div>
+    </div>
+
+    <div class="cart-lines to-lines" id="cart-lines">
+      <div class="cart-empty" id="cart-empty">{{ icon('utensils', 30) }}<p><strong>Table is free</strong><br>Tap items to start an order</p></div>
+      <div id="sent-lines"></div>
+      <div id="new-lines"></div>
+    </div>
+
+    <div class="cart-totals">
+      <div class="tot-row"><span>Subtotal · <span id="t-count">0 items</span></span><span id="t-subtotal">₹0.00</span></div>
+      <div class="tot-row"><span>GST <small class="muted">(CGST <span id="t-cgst">₹0.00</span> + SGST <span id="t-sgst">₹0.00</span>)</small></span><span id="t-gst">₹0.00</span></div>
+      {% if service_modes %}
+      <div class="tot-row">
+        <span>Service</span>
+        <select id="service-mode" class="mini-select tot-select">
+          <option value="" data-percent="0">None</option>
+          {% for s in service_modes %}<option value="{{ s.id }}" data-percent="{{ s.percent }}">{{ s.name }}{% if s.percent %} ({{ '%g'|format(s.percent) }}%){% endif %}</option>{% endfor %}
+        </select>
+        <span id="t-service">₹0.00</span>
+      </div>
+      {% endif %}
+      <div class="grand"><span>Grand Total</span><strong id="t-grand">₹0.00</strong></div>
+
+      {% if payment_modes %}
+      <div class="pay-row">
+        <div class="seg pay-modes" role="radiogroup" aria-label="Payment mode">
+          {% for m in payment_modes %}
+            <button type="button" class="pay{% if loop.first %} active{% endif %}" data-pay="{{ m.id }}" role="radio" aria-checked="{{ 'true' if loop.first else 'false' }}">{{ m.name }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+        <div class="alert alert-warning compact">{{ icon('alert', 15) }}<span>No payment options yet. Bills can be printed but not settled.</span></div>
+      {% endif %}
+
+      <div class="to-actions">
+        <button type="button" class="btn btn-ghost" id="act-save" title="Save new items without printing a KOT">Save</button>
+        <button type="button" class="btn btn-sun" id="act-kot" title="Save new items and print a KOT (Ctrl+Enter)">{{ icon('printer', 15) }} KOT &amp; Print</button>
+        <button type="button" class="btn btn-primary" id="act-bill" title="Print the bill for the whole table">{{ icon('receipt', 15) }} Print Bill</button>
+        <button type="button" class="btn btn-success" id="act-settle" hidden title="Mark the printed bill as paid">{{ icon('check', 15) }} Settle</button>
+      </div>
+      <p class="error-text center" id="cart-error" hidden></p>
+    </div>
+  </section>
+</div>
+<script type="application/json" id="menu-data">{{ categories|tojson }}</script>
+<script type="application/json" id="table-state">{{ state|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ asset('js/pos_menu.js') }}"></script><script src="{{ asset('js/table_order.js') }}"></script>{% endblock %}

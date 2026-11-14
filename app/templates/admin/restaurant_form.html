@@ -1,0 +1,193 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ rest.name if rest else 'Register Restaurant' }}{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const boxes = Array.from(document.querySelectorAll('input[name="modules"]'));
+  const warn = document.getElementById("modules-warn");
+  const sync = () => { warn.hidden = boxes.some((b) => b.checked); };
+  document.querySelectorAll("[data-modules]").forEach((b) => b.addEventListener("click", () => {
+    boxes.forEach((x) => (x.checked = b.dataset.modules === "all")); sync();
+  }));
+  boxes.forEach((b) => b.addEventListener("change", sync));
+  sync();
+})();
+</script>
+{% endblock %}
+{% block crumbs %}<a href="{{ url_for('admin.restaurants') }}">Restaurants</a> / <span>{{ 'Manage' if rest else 'New' }}</span>{% endblock %}
+{% block actions %}
+  {% if rest %}
+  <form method="post" action="{{ url_for('admin.restaurant_open', company_id=rest.id) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button class="btn btn-primary" type="submit">{{ icon('external', 16) }} Open this restaurant</button>
+  </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<form class="card form-card" method="post" enctype="multipart/form-data" novalidate data-busy-on-submit id="details">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <header class="card-head"><h2>Restaurant details</h2></header>
+  <div class="form-grid">
+    <label class="field span-2 {{ 'has-error' if errors.name }}">
+      <span>Restaurant name <em>*</em></span>
+      <input type="text" name="name" value="{{ form.name or '' }}" maxlength="150" required {% if not rest %}autofocus{% endif %}>
+      {% if errors.name %}<small class="error-text">{{ errors.name }}</small>{% else %}<small class="hint">Printed at the top of every bill.</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.location }}">
+      <span>Location / second line <em>*</em></span>
+      <input type="text" name="location" value="{{ form.location or '' }}" maxlength="75" required placeholder="e.g. Mullana, Ambala">
+      {% if errors.location %}<small class="error-text">{{ errors.location }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.abbreviation }}">
+      <span>Bill number prefix <em>*</em></span>
+      <input type="text" name="abbreviation" value="{{ form.abbreviation or '' }}" maxlength="2" minlength="2" required placeholder="Kp" style="text-transform:none">
+      {% if errors.abbreviation %}<small class="error-text">{{ errors.abbreviation }}</small>{% else %}<small class="hint">2 letters. Bills are numbered {{ (form.abbreviation or 'Kp') }}01, {{ (form.abbreviation or 'Kp') }}02 …</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.gst_no }}">
+      <span>GSTIN</span>
+      <input type="text" name="gst_no" value="{{ form.gst_no or '' }}" maxlength="15" placeholder="15 characters, optional">
+      {% if errors.gst_no %}<small class="error-text">{{ errors.gst_no }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.state }}">
+      <span>State</span>
+      <input type="text" name="state" value="{{ form.state or '' }}" maxlength="150">
+    </label>
+    <label class="field span-2 {{ 'has-error' if errors.address }}">
+      <span>Full address</span>
+      <textarea name="address" rows="2" maxlength="555">{{ form.address or '' }}</textarea>
+      {% if errors.address %}<small class="error-text">{{ errors.address }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.open_time }}">
+      <span>Opens at</span>
+      <input type="time" name="open_time" value="{{ form.open_time.strftime('%H:%M') if form.open_time and form.open_time.strftime is defined else (form.open_time or '') }}">
+      {% if errors.open_time %}<small class="error-text">{{ errors.open_time }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.close_time }}">
+      <span>Closes at</span>
+      <input type="time" name="close_time" value="{{ form.close_time.strftime('%H:%M') if form.close_time and form.close_time.strftime is defined else (form.close_time or '') }}">
+      {% if errors.close_time %}<small class="error-text">{{ errors.close_time }}</small>{% endif %}
+    </label>
+    <label class="field">
+      <span>Status</span>
+      <select name="status">
+        <option value="open" {% if form.status == 'open' %}selected{% endif %}>Open</option>
+        <option value="closed" {% if form.status != 'open' %}selected{% endif %}>Closed</option>
+      </select>
+    </label>
+    {% if not rest %}
+    <div class="field">
+      <span>Payment options</span>
+      <label class="check"><input type="checkbox" name="default_payments" value="1" checked> Add Cash, Card and UPI</label>
+    </div>
+    {% endif %}
+    <div class="field span-2 {{ 'has-error' if errors.logo }}">
+      <span>Logo</span>
+      <div class="image-picker">
+        <div class="image-preview logo-preview" data-preview-for="logo">
+          {% if logo_url %}<img src="{{ logo_url }}" alt="Current logo">{% else %}<img src="{{ asset('img/kp-emblem.png') }}" alt="Default logo" class="faded">{% endif %}
+        </div>
+        <div>
+          <input type="file" id="logo" name="logo" accept="image/*" data-image-input>
+          <small class="hint">PNG with a transparent background looks best. Without a logo, the Kailash Parvatam logo is used.</small>
+          {% if logo_url %}<label class="check"><input type="checkbox" name="remove_logo" value="1"> Remove current logo</label>{% endif %}
+          {% if errors.logo %}<small class="error-text">{{ errors.logo }}</small>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <fieldset class="module-box" id="modules">
+    <legend>Modules</legend>
+    <input type="hidden" name="modules_present" value="1">
+    <p class="muted small">Choose what this restaurant can use. Turned-off modules are hidden from the menu and blocked for every login of this restaurant. Dashboard is always on.</p>
+    <div class="module-grid">
+      {% for key, (label, desc, _keys) in modules.items() %}
+      <label class="module-opt">
+        <input type="checkbox" name="modules" value="{{ key }}" {% if key in selected %}checked{% endif %}>
+        <span><strong>{{ label }}</strong><small>{{ desc }}</small></span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="btn-row module-quick">
+      <button type="button" class="link small" data-modules="all">Select all</button>
+      <button type="button" class="link small" data-modules="none">Clear all</button>
+    </div>
+    <p class="error-text small" id="modules-warn" hidden>No modules selected: staff of this restaurant will only see the Dashboard.</p>
+  </fieldset>
+
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{{ url_for('admin.restaurants') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit">{{ icon('check', 16) }} {{ 'Save details' if rest else 'Register restaurant' }}</button>
+  </div>
+</form>
+
+{% if rest %}
+<section class="grid-2 admin-sections">
+  <article class="card" id="payments">
+    <header class="card-head"><h2>Payment options</h2><span class="muted small">Shown as buttons on Generate Bill</span></header>
+    {% if payment_modes %}
+      <ul class="mode-list">
+        {% for m in payment_modes %}
+        <li>
+          <span class="badge badge-brand">{{ m.name }}</span>
+          <span class="muted small">{{ "{:,}".format(m.used) }} bills</span>
+          {% if not m.used %}
+          <form method="post" action="{{ url_for('admin.payment_mode_delete', company_id=rest.id, mode_id=m.id) }}" class="inline" data-confirm="Remove '{{ m.name }}'?">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="icon-btn danger" type="submit" title="Remove">{{ icon('trash', 15) }}</button>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="alert alert-warning compact">{{ icon('alert', 16) }}<span>No payment options yet, so this restaurant cannot save bills.</span></div>
+    {% endif %}
+    <form method="post" action="{{ url_for('admin.payment_mode_add', company_id=rest.id) }}" class="inline-add">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="text" name="payment_mode" maxlength="40" placeholder="e.g. Company BTC" aria-label="New payment option">
+      <button class="btn btn-ghost" type="submit">{{ icon('plus', 16) }} Add</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.payment_mode_add', company_id=rest.id) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="defaults" value="1">
+      <button class="btn btn-sun btn-block" type="submit">{{ icon('check', 16) }} Add Cash, Card &amp; UPI</button>
+    </form>
+  </article>
+
+  <article class="card" id="staff">
+    <header class="card-head"><h2>Staff logins</h2>
+      <a class="btn btn-primary" href="{{ url_for('admin.staff_new', company_id=rest.id) }}">{{ icon('plus', 16) }} Add login</a></header>
+    {% if staff %}
+    <div class="table-wrap">
+      <table class="table compact">
+        <thead><tr><th>Name</th><th>Role</th><th>Status</th><th class="actions-col"></th></tr></thead>
+        <tbody>
+          {% for p in staff %}
+          <tr class="{{ 'row-muted' if not p.active }}">
+            <td><strong>{{ p.name }}</strong><div class="muted small">{{ p.email }}</div></td>
+            <td class="small">{{ p.role }}</td>
+            <td>{% if p.active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge badge-grey">Inactive</span>{% endif %}</td>
+            <td class="actions-col"><a class="icon-btn" href="{{ url_for('admin.staff_edit', company_id=rest.id, staff_id=p.id) }}" title="Edit">{{ icon('edit', 16) }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty">{{ icon('user', 28) }}<p>No one can sign in to this restaurant yet.</p></div>
+    {% endif %}
+  </article>
+</section>
+
+<details class="card danger-zone">
+  <summary>{{ icon('trash', 16) }} Delete restaurant</summary>
+  <p class="muted">Only possible while the restaurant has no bills, menu or staff. Otherwise set its status to Closed.</p>
+  <form method="post" action="{{ url_for('admin.restaurant_delete', company_id=rest.id) }}" data-confirm="Delete {{ rest.name }} permanently?">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button class="btn btn-ghost danger-btn" type="submit">{{ icon('trash', 16) }} Delete {{ rest.name }}</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

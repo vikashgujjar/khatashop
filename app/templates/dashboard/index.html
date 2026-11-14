@@ -1,0 +1,148 @@
+{% extends "layouts/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block crumbs %}<span>{{ company.name }}</span>{% endblock %}
+{% block actions %}
+  <a class="btn btn-primary" href="{{ url_for('bills.create') }}">{{ icon('plus', 16) }} Generate Bill</a>
+{% endblock %}
+
+{% block content %}
+{% macro change(pct) -%}
+  {% if pct is none %}<span class="delta flat">No earlier data</span>
+  {% elif pct >= 0 %}<span class="delta up">{{ icon('trend-up', 14) }} {{ "%.1f"|format(pct) }}% vs previous</span>
+  {% else %}<span class="delta down">{{ icon('trend-down', 14) }} {{ "%.1f"|format(-pct) }}% vs previous</span>{% endif %}
+{%- endmacro %}
+<section class="hero">
+  <div class="hero-text">
+    <h2>{{ greeting }}, {{ current_user.name }}</h2>
+    <p>{{ company.name }} · {{ icon('calendar', 14) }}
+      {% if start == end %}{{ start.strftime('%A, %d %b %Y') }}{% else %}{{ start.strftime('%d %b %Y') }} – {{ end.strftime('%d %b %Y') }}{% endif %}
+    </p>
+  </div>
+  <div class="chips" role="tablist" aria-label="Period">
+    {% for key, label in ranges.items() %}
+      <a class="chip{% if key == range_key %} active{% endif %}" href="{{ url_for('dashboard.index', range=key) }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="kpis">
+  <article class="kpi tone-green">
+    <div class="kpi-icon">{{ icon('rupee') }}</div>
+    <div class="kpi-label">Total sales</div>
+    <div class="kpi-value">₹{{ stats.sales|money }}</div>
+    {{ change(sales_change) }}
+  </article>
+  <article class="kpi tone-sun">
+    <div class="kpi-icon">{{ icon('receipt') }}</div>
+    <div class="kpi-label">Bills</div>
+    <div class="kpi-value">{{ "{:,}".format(stats.bills) }}</div>
+    {{ change(bills_change) }}
+  </article>
+  <article class="kpi tone-rose">
+    <div class="kpi-icon">{{ icon('cart') }}</div>
+    <div class="kpi-label">Average bill</div>
+    <div class="kpi-value">₹{{ stats.average|money }}</div>
+    <span class="delta flat">{{ "{:,}".format(stats.quantity|int) }} items sold</span>
+  </article>
+  <article class="kpi tone-blue">
+    <div class="kpi-icon">{{ icon('percent') }}</div>
+    <div class="kpi-label">GST collected</div>
+    <div class="kpi-value">₹{{ stats.gst|money }}</div>
+    <span class="delta flat">CGST + SGST</span>
+  </article>
+</section>
+
+<section class="grid-2-1">
+  <article class="card">
+    <header class="card-head"><h2>Sales trend</h2><span class="muted small">{{ 'Daily' if series_unit == 'day' else 'Monthly' }} totals</span></header>
+    {% if series_max > 0 %}
+    <div class="bar-chart" role="img" aria-label="Sales by {{ series_unit }}">
+      {% for p in series %}
+        <div class="bar-col" title="{{ p.label }}: ₹{{ p.amount|money }} ({{ p.bills }} bills)">
+          <div class="bar-track"><div class="bar" style="height: {{ (p.amount / series_max * 100)|round(1) }}%"></div></div>
+          {% if series|length <= 14 or loop.first or loop.last or loop.index0 % ((series|length // 7) or 1) == 0 %}
+            <span class="bar-label">{{ p.label }}</span>
+          {% else %}<span class="bar-label">&nbsp;</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="empty">{{ icon('trend-up', 28) }}<p>No sales in this period yet.</p></div>
+    {% endif %}
+  </article>
+
+  <article class="card">
+    <header class="card-head"><h2>Payment modes</h2></header>
+    {% if payments %}
+      {% set total = payments|sum(attribute='amount') %}
+      <ul class="share-list">
+        {% for p in payments %}
+          {% set pct = (p.amount / total * 100) if total else 0 %}
+          <li>
+            <div class="share-row"><strong>{{ p.name }}</strong><span>₹{{ p.amount|money }}</span></div>
+            <div class="share-track"><div class="share-bar" style="width: {{ pct|round(1) }}%"></div></div>
+            <div class="share-meta muted small">{{ p.bills }} bills · {{ "%.1f"|format(pct) }}%</div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty">{{ icon('rupee', 28) }}<p>No payments in this period.</p></div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="grid-2">
+  <article class="card">
+    <header class="card-head"><h2>Top selling items</h2></header>
+    {% if top_items %}
+      <table class="table compact">
+        <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Sales</th></tr></thead>
+        <tbody>
+        {% for item in top_items %}
+          <tr><td><span class="rank">{{ loop.index }}</span>{{ item.name }}</td><td class="num">{{ item.quantity }}</td><td class="num">₹{{ item.amount|money }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty">{{ icon('box', 28) }}<p>Nothing sold in this period.</p></div>
+    {% endif %}
+  </article>
+
+  <article class="card">
+    <header class="card-head"><h2>Recent bills</h2><a class="link" href="{{ url_for('bills.index') }}">View all</a></header>
+    {% if recent %}
+      <ul class="recent-list">
+        {% for b in recent %}
+        <li>
+          <a href="{{ url_for('bills.show', bill_id=b.id) }}">
+            <span class="recent-no">{{ b.bill_no }}</span>
+            <span class="recent-meta">{{ b.billing_date.strftime('%d %b %Y') if b.billing_date else '—' }} · {{ b.payment_mode or '—' }}{% if b.customer_name %} · {{ b.customer_name }}{% endif %}</span>
+            <span class="recent-amt">₹{{ b.total|money }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty">{{ icon('receipt', 28) }}<p>No bills yet. <a href="{{ url_for('bills.create') }}">Create the first one</a>.</p></div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="menu-status">
+  <a class="status-tile" href="{{ url_for('menu_category.index') }}">
+    {{ icon('tag', 22) }}
+    <div><strong>{{ counts.active_categories }} / {{ counts.categories }}</strong><span>categories visible</span></div>
+  </a>
+  <a class="status-tile" href="{{ url_for('menu.index') }}">
+    {{ icon('book', 22) }}
+    <div><strong>{{ counts.active_items }} / {{ counts.item_count }}</strong><span>items available for billing</span></div>
+  </a>
+  <a class="status-tile" href="{{ url_for('menu_pdf.index') }}">
+    {{ icon('file', 22) }}
+    <div>
+      {% if menu_pdf %}<strong>PDF menu live</strong><span>updated {{ menu_pdf.modified.strftime('%d %b %Y') }}</span>
+      {% else %}<strong>No PDF menu</strong><span>upload one for customers</span>{% endif %}
+    </div>
+  </a>
+</section>
+{% endblock %}

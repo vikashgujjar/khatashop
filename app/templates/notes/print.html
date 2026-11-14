@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ nt.title }} Note {{ note.ref }}</title><link rel="stylesheet" href="{{ asset('css/app.css') }}"></head>
+<body class="doc-page">
+  <div class="receipt-toolbar no-print">
+    <a class="btn btn-ghost" href="{{ url_for('notes.index', resource=nt.key) }}">{{ icon('arrow-left', 16) }} Back</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 16) }} Print / Save as PDF</button>
+  </div>
+  <article class="doc">
+    <header class="doc-head">
+      <div><h1>{{ company.name }}</h1><p>{{ company.address_line or '' }}</p>{% if company.gst_no %}<p>GSTIN: {{ company.gst_no }}</p>{% endif %}</div>
+      <div class="doc-title"><h2>{{ nt.title|upper }} NOTE</h2><p><strong>{{ note.ref }}</strong></p>
+        <p>Date: {{ note.note_date.strftime('%d-%m-%Y') if note.note_date and note.note_date.year > 1000 else '—' }}</p></div>
+    </header>
+    {% if nt.priced %}<p class="doc-meta"><strong>Vendor:</strong> {{ note.vendor or '—' }} &nbsp; <strong>Invoice:</strong> {{ note.invoice_no or '—' }} &nbsp; <strong>Payment:</strong> {{ payment.get(note.payment_status, '—') }}</p>{% endif %}
+    <table class="table compact">
+      <thead><tr><th>#</th><th>Ingredient</th><th class="num">Quantity</th><th>Unit</th>{% if nt.priced %}<th class="num">Rate</th><th class="num">GST %</th><th class="num">Amount</th>{% endif %}</tr></thead>
+      <tbody>{% for l in note['lines'] %}<tr><td>{{ loop.index }}</td><td>{{ l.ingredient_name }}</td><td class="num">{{ '%g'|format(l.quantity|float) }}</td><td>{{ l.ingredient_unit or '' }}</td>
+        {% if nt.priced %}<td class="num">{{ l.rate|money }}</td><td class="num">{{ '%g'|format(l.ingredient_gst|float) }}</td><td class="num">{{ l.total|money }}</td>{% endif %}</tr>{% endfor %}</tbody>
+    </table>
+    <div class="doc-totals">
+      <div><span>Total quantity</span><strong>{{ note.total_quantity }}</strong></div>
+      {% if nt.priced %}<div><span>CGST</span><span>{{ note.cgst|money }}</span></div><div><span>SGST</span><span>{{ note.sgst|money }}</span></div>
+      <div class="r-grand"><span>Total</span><span>₹{{ note.total|money }}</span></div>{% endif %}
+    </div>
+    <footer class="doc-sign"><span>Prepared by: {{ note.counter or '—' }}</span><span>Received by: ____________</span></footer>
+  </article>
+</body></html>

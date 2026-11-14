@@ -1,0 +1,93 @@
+{% extends "layouts/base.html" %}
+{% from "partials/pagination.html" import pagination with context %}
+{% block title %}Bill Detail{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Bill Detail</span>{% endblock %}
+{% block actions %}
+  <a class="btn btn-success" href="{{ url_for('bills.export', **filters) }}">{{ icon('excel', 16) }} Export Excel</a>
+  <a class="btn btn-primary" href="{{ url_for('bills.create') }}">{{ icon('plus', 16) }} Generate Bill</a>
+{% endblock %}
+
+{% block content %}
+{% set any_filter = filters.values()|select|list|length > 0 %}
+<div class="card">
+  <form class="toolbar wrap" method="get">
+    <label class="search grow">
+      {{ icon('search', 16) }}
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="Bill no, customer, mobile or item" aria-label="Search bills">
+    </label>
+    <select name="session" aria-label="Financial session" data-autosubmit>
+      <option value="">Select Session</option>
+      {% for s in sessions %}<option value="{{ s }}" {% if filters.session == s|string %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+    <select name="quarter" aria-label="Quarter" data-autosubmit>
+      <option value="">Select Quarter</option>
+      {% for q in quarters %}<option value="{{ q }}" {% if filters.quarter == q %}selected{% endif %}>{{ q }}</option>{% endfor %}
+    </select>
+    <select name="order_type" aria-label="Order type" data-autosubmit>
+      <option value="">Order Type</option>
+      {% for code, label in order_types.items() %}<option value="{{ code }}" {% if filters.order_type == code|string %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="payment_mode_id" aria-label="Payment mode" data-autosubmit>
+      <option value="">Payment Mode</option>
+      {% for m in payment_modes %}<option value="{{ m.id }}" {% if filters.payment_mode_id == m.id|string %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
+    </select>
+    <label class="date-field" title="From date">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ filters.date_from }}" aria-label="From date"></label>
+    <label class="date-field" title="To date">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ filters.date_to }}" aria-label="To date"></label>
+    <select name="per_page" aria-label="Rows per page" data-autosubmit>
+      {% for n in (10, 20, 50, 100) %}<option value="{{ n }}" {% if pager.per_page == n %}selected{% endif %}>Show {{ n }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Filter</button>
+    {% if any_filter %}<a class="link" href="{{ url_for('bills.index') }}">Clear</a>{% endif %}
+  </form>
+
+  <div class="summary-strip">
+    <div><span class="muted small">Bills</span><strong>{{ "{:,}".format(summary.bills) }}</strong></div>
+    <div><span class="muted small">Amount</span><strong>₹{{ summary.amount|money }}</strong></div>
+    {% if any_filter %}<div class="muted small">Filtered results</div>{% endif %}
+  </div>
+
+  {% if bills %}
+  <div class="table-wrap">
+    <table class="table bills-table">
+      <thead>
+        <tr>
+          <th>SrNo</th><th>Bill Number</th><th>Billing Date</th><th class="num">Total Quantity</th><th class="num">Total</th>
+          <th class="num">CGST</th><th class="num">SGST</th><th>Financial Session</th><th>Item Detail</th><th>Payment Mode</th><th>Counter</th><th class="actions-col"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for b in bills %}
+        <tr>
+          <td class="muted">{{ pager.offset + loop.index }}</td>
+          <td><a class="bill-no" href="{{ url_for('bills.show', bill_id=b.id) }}">{{ b.bill_no }}</a>
+            {% if b.order_type and b.order_type != 1 %}<span class="badge badge-rose">{{ b.order_type_label }}</span>{% endif %}
+            {% if b.customer_name %}<div class="muted small">{{ b.customer_name }}{% if b.customer_mb_no %} · {{ b.customer_mb_no }}{% endif %}</div>{% endif %}</td>
+          <td class="nowrap">{{ b.billing_date.strftime('%Y-%m-%d') if b.billing_date else '—' }}</td>
+          <td class="num">{{ b.total_quantity }}</td>
+          <td class="num"><strong>{{ b.total }}</strong></td>
+          <td class="num">{{ b.cgst }}</td>
+          <td class="num">{{ b.sgst }}</td>
+          <td class="nowrap">{{ b.financial_session or '—' }}{% if b.financial_quarter %} <span class="badge badge-grey">{{ b.financial_quarter }}</span>{% endif %}</td>
+          <td class="items-cell">
+            {% for i in b['items'] %}<div>{{ i.item_name }} <b>Q[{{ i.quantity }}]</b></div>{% endfor %}
+          </td>
+          <td>{% if b.payment_mode %}<span class="badge badge-brand">{{ b.payment_mode }}</span>{% else %}—{% endif %}</td>
+          <td class="small">{{ b.counter_name or '—' }}</td>
+          <td class="actions-col">
+            <a class="icon-btn" href="{{ url_for('bills.show', bill_id=b.id) }}" title="View bill">{{ icon('eye', 16) }}</a>
+            <a class="icon-btn" href="{{ url_for('bills.show', bill_id=b.id, print=1) }}" title="Print bill">{{ icon('printer', 16) }}</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(pager, "bills") }}
+  {% else %}
+    <div class="empty">{{ icon('receipt', 32) }}
+      <p>{% if any_filter %}No bills match your filters.{% else %}No bills yet.{% endif %}</p>
+      <a class="btn btn-primary" href="{{ url_for('bills.create') }}">{{ icon('plus', 16) }} Generate Bill</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

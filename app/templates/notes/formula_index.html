@@ -1,0 +1,23 @@
+{% extends "layouts/base.html" %}
+{% block title %}Consumption Formula{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Inventory</span>{% endblock %}
+{% block content %}
+<div class="alert alert-info compact">{{ icon('info', 15) }}<span>A recipe lists the ingredients used to make one portion of a menu item. The Item Consumption report uses it.</span></div>
+<div class="card">
+  <form class="toolbar" method="get">
+    <label class="search grow">{{ icon('search', 16) }}<input type="search" name="q" value="{{ q }}" placeholder="Search menu items" aria-label="Search"></label>
+    <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Search</button>
+    <span class="toolbar-spacer"></span><span class="muted small">{{ items|selectattr('line_count')|list|length }} of {{ items|length }} items have a recipe</span>
+  </form>
+  {% if items %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>SrNo</th><th>Item Name</th><th>Category</th><th>Ingredient List</th><th class="actions-col"></th></tr></thead>
+    <tbody>{% for i in items %}<tr>
+      <td class="muted">{{ loop.index }}</td><td><strong>{{ i.name }}</strong></td><td class="small">{{ i.category }}</td>
+      <td class="items-cell">{{ i.recipe or '—' }}</td>
+      <td class="actions-col"><a class="btn btn-ghost" href="{{ url_for('formula.edit', item_id=i.id) }}">{{ icon('edit', 15) }} {{ 'Edit' if i.line_count else 'Add' }} recipe</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty">{{ icon('book', 30) }}<p>No menu items found.</p></div>{% endif %}
+</div>
+{% endblock %}

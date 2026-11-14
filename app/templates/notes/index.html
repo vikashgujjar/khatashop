@@ -1,0 +1,52 @@
+{% extends "layouts/base.html" %}
+{% from "partials/pagination.html" import pagination with context %}
+{% block title %}{{ nt.title }} Detail{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Inventory</span>{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="{{ url_for('notes.create', resource=nt.key) }}">{{ icon('plus', 16) }} New {{ nt.title }} Note</a>{% endblock %}
+
+{% block content %}
+<div class="card">
+  <form class="toolbar wrap" method="get">
+    <label class="search grow">{{ icon('search', 16) }}<input type="search" name="q" value="{{ filters.q }}" placeholder="Ref no, ingredient{{ ', vendor or invoice' if nt.priced }}" aria-label="Search"></label>
+    <label class="date-field">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ filters.date_from }}" aria-label="From"></label>
+    <label class="date-field">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ filters.date_to }}" aria-label="To"></label>
+    <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Filter</button>
+    {% if filters.values()|select|list %}<a class="link" href="{{ url_for('notes.index', resource=nt.key) }}">Clear</a>{% endif %}
+  </form>
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>SrNo</th><th>{{ nt.title }} Ref No</th>{% if nt.priced %}<th>Invoice No</th><th>Vendor</th>{% endif %}<th>Ingredient List</th><th>Date</th><th class="num">Total Qty</th>
+        {% if nt.priced %}<th class="num">CGST</th><th class="num">SGST</th><th class="num">Total</th><th>Payment</th>{% endif %}<th>Counter</th><th class="actions-col"></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="muted">{{ pager.offset + loop.index }}</td>
+          <td><a class="bill-no" href="{{ url_for('notes.edit', resource=nt.key, note_id=r.id) }}">{{ r.ref }}</a></td>
+          {% if nt.priced %}<td>{{ r.invoice_no or '—' }}</td><td>{{ r.vendor or '—' }}</td>{% endif %}
+          <td class="items-cell">{% for l in r['lines'][:5] %}<div>{{ l.ingredient_name }} <b>{{ '%g'|format(l.quantity|float) }} {{ l.ingredient_unit or '' }}</b></div>{% endfor %}
+            {% if r['lines']|length > 5 %}<span class="muted small">+{{ r['lines']|length - 5 }} more</span>{% endif %}</td>
+          <td class="nowrap">{{ r.note_date.strftime('%d-%m-%Y') if r.note_date and r.note_date.year > 1000 else '—' }}</td>
+          <td class="num">{{ r.total_quantity }}</td>
+          {% if nt.priced %}<td class="num">{{ r.cgst|money }}</td><td class="num">{{ r.sgst|money }}</td><td class="num"><strong>{{ r.total|money }}</strong></td>
+            <td><span class="badge {{ 'badge-green' if r.payment_status == 1 else 'badge-grey' }}">{{ payment.get(r.payment_status, '—') }}</span></td>{% endif %}
+          <td class="small">{{ r.counter or '—' }}</td>
+          <td class="actions-col">
+            <a class="icon-btn" href="{{ url_for('notes.print_note', resource=nt.key, note_id=r.id) }}" title="Print / download" target="_blank">{{ icon('printer', 16) }}</a>
+            <a class="icon-btn" href="{{ url_for('notes.edit', resource=nt.key, note_id=r.id) }}" title="Edit">{{ icon('edit', 16) }}</a>
+            <form method="post" action="{{ url_for('notes.delete', resource=nt.key, note_id=r.id) }}" class="inline" data-confirm="Delete note {{ r.ref }}?">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="icon-btn danger" type="submit" title="Delete">{{ icon('trash', 16) }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(pager, "notes") }}
+  {% else %}
+    <div class="empty">{{ icon('file', 30) }}<p>No {{ nt.title|lower }} notes{{ ' match your filters' if filters.values()|select|list }}.</p>
+      <a class="btn btn-primary" href="{{ url_for('notes.create', resource=nt.key) }}">{{ icon('plus', 16) }} New {{ nt.title }} Note</a></div>
+  {% endif %}
+</div>
+{% endblock %}

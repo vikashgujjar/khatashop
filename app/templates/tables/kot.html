@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KOT · {{ company.name }}</title>
+  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+</head>
+<body class="receipt-page{% if embedded %} embedded{% endif %}">
+  {% if not embedded %}
+  <div class="receipt-toolbar no-print">
+    <a class="btn btn-ghost" href="{{ url_for('tables.index') }}">{{ icon('arrow-left', 16) }} Table View</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">{{ icon('printer', 16) }} Print</button>
+  </div>
+  {% endif %}
+  {% for k in kots %}
+  <article class="receipt kot">
+    <header class="r-head">
+      <p class="r-title">KITCHEN ORDER TICKET</p>
+      <h1>Table {{ k.table_name or '—' }}</h1>
+    </header>
+    <dl class="r-meta">
+      <div><dt>KOT No</dt><dd><strong>{{ k.no }}</strong></dd></div>
+      <div><dt>Time</dt><dd>{{ k.created.strftime('%d-%m-%Y %I:%M %p') if k.created else '' }}</dd></div>
+      {% if k.staff %}<div><dt>By</dt><dd>{{ k.staff }}</dd></div>{% endif %}
+    </dl>
+    <table class="r-items kot-items">
+      <thead><tr><th>Item</th><th class="num">Qty</th></tr></thead>
+      <tbody>
+        {% for l in k.lines %}
+        <tr><td>{{ l.name }}{% if l.note %}<div class="kot-note">» {{ l.note }}</div>{% endif %}</td><td class="num"><strong>{{ l.quantity }}</strong></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <footer class="r-foot">{{ k.lines|sum(attribute='quantity') }} item(s)</footer>
+  </article>
+  {% endfor %}
+</body>
+</html>

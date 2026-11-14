@@ -1,0 +1,23 @@
+{% extends "layouts/base.html" %}
+{% block title %}Staff Logins{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Staff &amp; Settings</span>{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="{{ url_for('staff.create') }}">{{ icon('plus', 16) }} Add Login</a>{% endblock %}
+{% block content %}
+<div class="report-tabs">
+  <a class="chip{% if role is none %} active{% endif %}" href="{{ url_for('staff.index') }}">All</a>
+  {% for code, label in roles.items() %}<a class="chip{% if role == code %} active{% endif %}" href="{{ url_for('staff.index', role=code) }}">{{ label }}</a>{% endfor %}
+</div>
+<div class="card">
+  {% if people %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>SrNo</th><th>Name</th><th>Email (login)</th><th>Contact No.</th><th>Role</th><th>Status</th><th class="actions-col"></th></tr></thead>
+    <tbody>{% for p in people %}<tr class="{{ 'row-muted' if not p.active }}">
+      <td class="muted">{{ loop.index }}</td><td><strong>{{ p.name }}</strong></td><td>{{ p.email }}</td><td>{{ p.contact_no or '—' }}</td>
+      <td><span class="badge badge-brand">{{ p.role }}</span></td>
+      <td>{% if p.active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge badge-grey">Inactive</span>{% endif %}</td>
+      <td class="actions-col"><a class="icon-btn" href="{{ url_for('staff.edit', staff_id=p.id) }}" title="Edit">{{ icon('edit', 16) }}</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty">{{ icon('user', 30) }}<p>No staff logins{{ ' with this role' if role is not none }}.</p></div>{% endif %}
+</div>
+{% endblock %}

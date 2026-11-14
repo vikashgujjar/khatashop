@@ -1,0 +1,73 @@
+{
+  "database": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "DB_USER",
+    "password": "DB_PASSWORD",
+    "name": "DB_NAME",
+    "charset": "utf8mb4",
+    "connect_timeout": 5,
+    "read_timeout": 30,
+    "write_timeout": 30
+  },
+  "app": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "secret_key": "CHANGE_ME_TO_A_LONG_RANDOM_STRING",
+    "debug": false,
+    "timezone": "Asia/Kolkata",
+    "session_hours": 12,
+    "items_per_page": 20
+  },
+  "uploads": {
+    "base_dir": "../backend/project/public/uploads",
+    "max_upload_mb": 10,
+    "legacy_menu_pdf_company": null
+  },
+  "server": {
+    "threads": 8,
+    "auto_restart": true,
+    "watch_dirs": [
+      "app"
+    ],
+    "watch_extensions": [
+      ".py",
+      ".html",
+      ".css",
+      ".js",
+      ".json"
+    ],
+    "restart_delay_seconds": 1.0,
+    "max_crash_restarts_per_minute": 5
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/app.log",
+    "max_bytes": 5242880,
+    "backup_count": 5
+  },
+  "online_orders": {
+    "vendor_by_company": {
+      "2": 1
+    }
+  },
+  "customers": {
+    "kpusers_organization_by_company": {
+      "6": [
+        "kailash-parvatam"
+      ],
+      "8": [
+        "ogi-kailash-parbat"
+      ],
+      "9": [
+        "skp-kailash-parvatam"
+      ]
+    }
+  },
+  "legacy_api": {
+    "enabled": true,
+    "base_url": "http://127.0.0.1:8000",
+    "timeout_seconds": 30,
+    "public_base_url": "https://api.khatashop.com"
+  }
+}

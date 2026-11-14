@@ -1,0 +1,42 @@
+{% macro import_box(what, template_url, export_url, import_url, import_errors=None, create_categories=False) %}
+<details class="card io-card" {% if import_errors %}open{% endif %}>
+  <summary>
+    <span class="io-title">{{ icon('excel', 18) }} Import / Export Excel</span>
+    <span class="muted small">Add or update many {{ what }} at once from a spreadsheet</span>
+    {{ icon('chevron-down', 16, 'io-chevron') }}
+  </summary>
+  <div class="io-body">
+    <ol class="io-steps">
+      <li>
+        <strong>Get the file</strong>
+        <span class="muted small">Start from the template, or export what you have now and edit it.</span>
+        <div class="btn-row">
+          <a class="btn btn-ghost" href="{{ template_url }}">{{ icon('download', 16) }} Download template</a>
+          <a class="btn btn-ghost" href="{{ export_url }}">{{ icon('excel', 16) }} Export current {{ what }}</a>
+        </div>
+      </li>
+      <li>
+        <strong>Upload it</strong>
+        <span class="muted small">.xlsx or .csv. Matching {{ what }} are updated, new ones are added, nothing is deleted.</span>
+        <form class="io-form" method="post" action="{{ import_url }}" enctype="multipart/form-data" data-busy-on-submit>
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <input type="file" name="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" required>
+          {% if create_categories %}
+            <label class="check"><input type="checkbox" name="create_categories" value="1" checked> Create missing categories</label>
+          {% endif %}
+          <button class="btn btn-primary" type="submit">{{ icon('upload', 16) }} Import</button>
+        </form>
+      </li>
+    </ol>
+    {% if import_errors %}
+      <div class="io-errors" role="alert">
+        <strong>{{ import_errors|length }} problem{{ '' if import_errors|length == 1 else 's' }} found. Nothing was imported. Fix these rows in the file and upload it again:</strong>
+        <ul>
+          {% for e in import_errors[:50] %}<li>{{ e }}</li>{% endfor %}
+          {% if import_errors|length > 50 %}<li>… and {{ import_errors|length - 50 }} more.</li>{% endif %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+</details>
+{% endmacro %}

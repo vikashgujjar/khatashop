@@ -1,0 +1,82 @@
+{% extends "layouts/base.html" %}
+{% block title %}Kitchen{% endblock %}
+{% block crumbs %}<span>Kitchen Order Tickets</span>{% endblock %}
+{% block actions %}<span class="tv-refresh muted small" id="k-updated">{{ icon('refresh', 13) }} Live</span>{% endblock %}
+
+{% block content %}
+<div class="k-cols">
+  <section>
+    <h2 class="k-title">To prepare <span class="count-pill" id="k-wait-count">0</span></h2>
+    <div class="k-grid" id="k-waiting"></div>
+  </section>
+  <section class="k-ready-col">
+    <h2 class="k-title">Ready (last 30 min) <span class="count-pill" id="k-ready-count">0</span></h2>
+    <div class="k-grid narrow" id="k-ready"></div>
+  </section>
+</div>
+<script type="application/json" id="k-data">{{ board|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+  const api = "{{ url_for('tables.kitchen_json') }}";
+  const readyUrl = (id) => "{{ url_for('tables.kitchen_ready', kot_id=0) }}".replace(/\/0\/ready$/, "/" + id + "/ready");
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+
+  function card(k, ready) {
+    const c = el("article", "k-card" + (ready ? " ready" : k.minutes >= 15 ? " late" : ""));
+    const head = el("header");
+    head.append(el("strong", "", "Table " + k.table), el("span", "muted small", "KOT " + k.no + " · " + k.time + (ready ? "" : " · " + k.minutes + " min")));
+    c.appendChild(head);
+    const ul = el("ul");
+    k.lines.forEach((l) => {
+      const li = el("li");
+      li.append(el("b", "", l.quantity + " ×"), document.createTextNode(" " + l.name));
+      if (l.note) li.appendChild(el("em", "line-note", "» " + l.note));
+      ul.appendChild(li);
+    });
+    c.appendChild(ul);
+    const b = el("button", "btn " + (ready ? "btn-ghost" : "btn-primary") + " btn-block", ready ? "Undo" : "Ready");
+    b.type = "button";
+    b.onclick = () => mark(k.id, !ready, b);
+    c.appendChild(b);
+    return c;
+  }
+
+  function render(board) {
+    const w = document.getElementById("k-waiting"), r = document.getElementById("k-ready");
+    w.replaceChildren(...(board.waiting.length ? board.waiting.map((k) => card(k, false)) : [el("p", "muted empty", "Nothing to prepare right now.")]));
+    r.replaceChildren(...board.ready.map((k) => card(k, true)));
+    document.getElementById("k-wait-count").textContent = board.waiting.length;
+    document.getElementById("k-ready-count").textContent = board.ready.length;
+  }
+
+  async function mark(id, ready, btn) {
+    btn.classList.add("is-busy");
+    try {
+      const res = await fetch(readyUrl(id), { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-Token": KS.csrf }, body: JSON.stringify({ ready }) });
+      const body = await res.json();
+      if (!body.ok) throw new Error(body.error);
+      render(body.board);
+    } catch (err) { KS.toast((err && err.message) || "Could not update the KOT.", "error"); btn.classList.remove("is-busy"); }
+  }
+
+  const stamp = document.getElementById("k-updated");
+  async function refresh() {
+    if (document.hidden) return;
+    try {
+      const res = await fetch(api, { headers: { Accept: "application/json" }, credentials: "same-origin" });
+      if (res.status === 401) { location.href = "/login"; return; }
+      const body = await res.json();
+      if (body.ok) { render(body.board); stamp.classList.remove("stale"); }
+    } catch (err) { stamp.classList.add("stale"); }
+  }
+  render(JSON.parse(document.getElementById("k-data").textContent));
+  setInterval(refresh, 10000);
+  document.addEventListener("visibilitychange", refresh);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+logs/*.log*
+db_config.json
+
+# never commit secrets or local data
+.env
+*.pem
+*.key
+*.uploading
+logs/

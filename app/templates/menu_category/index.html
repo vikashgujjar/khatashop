@@ -1,0 +1,69 @@
+{% extends "layouts/base.html" %}
+{% block title %}Menu Category{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Define Menu</span>{% endblock %}
+{% block actions %}
+  <a class="btn btn-primary" href="{{ url_for('menu_category.create') }}">{{ icon('plus', 16) }} Add Category</a>
+{% endblock %}
+
+{% block content %}
+{% from "partials/import_box.html" import import_box with context %}
+{{ import_box("categories", url_for('menu_category.template'), url_for('menu_category.export'), url_for('menu_category.import_file'), import_errors) }}
+<div class="card">
+  <form class="toolbar" method="get">
+    <label class="search">
+      {{ icon('search', 16) }}
+      <input type="search" name="q" value="{{ search }}" placeholder="Search categories" aria-label="Search categories">
+    </label>
+    <select name="status" aria-label="Status" data-autosubmit>
+      <option value="">All statuses</option>
+      <option value="1" {% if status == '1' %}selected{% endif %}>Show</option>
+      <option value="0" {% if status == '0' %}selected{% endif %}>Hide</option>
+    </select>
+    <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Filter</button>
+    {% if search or status %}<a class="link" href="{{ url_for('menu_category.index') }}">Clear</a>{% endif %}
+    <span class="toolbar-spacer"></span>
+    <span class="muted small">{{ categories|length }} categor{{ 'y' if categories|length == 1 else 'ies' }}</span>
+  </form>
+
+  {% if categories %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th style="width:64px">Photo</th><th>Category</th><th class="num">Items</th><th class="num">Order</th><th>Status</th><th class="actions-col">Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for c in categories %}
+        <tr class="{{ 'row-muted' if not c.active }}">
+          <td>
+            {% if c.image_url %}<img class="thumb" src="{{ c.image_url }}" alt="" loading="lazy">
+            {% else %}<span class="thumb thumb-empty">{{ c.name[:1]|upper }}</span>{% endif %}
+          </td>
+          <td><strong>{{ c.name }}</strong></td>
+          <td class="num"><a class="link" href="{{ url_for('menu.index', category=c.id) }}">{{ c.active_items }} / {{ c.item_count }}</a></td>
+          <td class="num">{{ c.sort_order }}</td>
+          <td>{% if c.active %}<span class="badge badge-green">Show</span>{% else %}<span class="badge badge-grey">Hide</span>{% endif %}</td>
+          <td class="actions-col">
+            <a class="icon-btn" href="{{ url_for('menu_category.edit', category_id=c.id) }}" title="Edit">{{ icon('edit', 16) }}</a>
+            <form method="post" action="{{ url_for('menu_category.toggle', category_id=c.id) }}" class="inline"
+                  data-confirm="{{ ('Hide ' ~ c.name ~ '? Its items will also be hidden from billing.') if c.active else ('Show ' ~ c.name ~ ' and all its items again?') }}">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="icon-btn" type="submit" title="{{ 'Hide' if c.active else 'Show' }}">{{ icon('eye-off' if c.active else 'eye', 16) }}</button>
+            </form>
+            <form method="post" action="{{ url_for('menu_category.delete', category_id=c.id) }}" class="inline" data-confirm="Delete the category '{{ c.name }}'? This cannot be undone.">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="icon-btn danger" type="submit" title="Delete">{{ icon('trash', 16) }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">{{ icon('tag', 32) }}
+      <p>{% if search or status %}No categories match your filters.{% else %}No categories yet.{% endif %}</p>
+      <a class="btn btn-primary" href="{{ url_for('menu_category.create') }}">{{ icon('plus', 16) }} Add Category</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

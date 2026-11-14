@@ -1,0 +1,82 @@
+{% extends "layouts/base.html" %}
+{% from "partials/pagination.html" import pagination with context %}
+{% block title %}Menu{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Define Menu</span>{% endblock %}
+{% block actions %}
+  <a class="btn btn-primary" href="{{ url_for('menu.create', category=filters.category_id) }}">{{ icon('plus', 16) }} Add Item</a>
+{% endblock %}
+
+{% block content %}
+{% from "partials/import_box.html" import import_box with context %}
+{{ import_box("menu items", url_for('menu.template'), url_for('menu.export'), url_for('menu.import_file'), import_errors, create_categories=True) }}
+<div class="card">
+  <form class="toolbar" method="get">
+    <label class="search">
+      {{ icon('search', 16) }}
+      <input type="search" name="q" value="{{ filters.search }}" placeholder="Search items" aria-label="Search items">
+    </label>
+    <select name="category" aria-label="Category" data-autosubmit>
+      <option value="">All categories</option>
+      {% for c in categories %}<option value="{{ c.id }}" {% if filters.category_id == c.id %}selected{% endif %}>{{ c.name }}{% if not c.active %} (hidden){% endif %}</option>{% endfor %}
+    </select>
+    <select name="veg" aria-label="Food type" data-autosubmit>
+      <option value="">Veg &amp; non-veg</option>
+      <option value="1" {% if filters.veg == '1' %}selected{% endif %}>VEG</option>
+      <option value="0" {% if filters.veg == '0' %}selected{% endif %}>NON VEG</option>
+    </select>
+    <select name="status" aria-label="Status" data-autosubmit>
+      <option value="">All statuses</option>
+      <option value="1" {% if filters.status == '1' %}selected{% endif %}>Show</option>
+      <option value="0" {% if filters.status == '0' %}selected{% endif %}>Hide</option>
+    </select>
+    <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Filter</button>
+    {% if filters.search or filters.category_id or filters.veg or filters.status %}<a class="link" href="{{ url_for('menu.index') }}">Clear</a>{% endif %}
+  </form>
+
+  {% if items %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th style="width:64px">Photo</th><th>Item</th><th>Category</th><th class="num">Price</th><th class="num">GST</th><th>Veg</th><th>Status</th><th class="actions-col">Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for item in items %}
+        <tr class="{{ 'row-muted' if not item.active }}">
+          <td>
+            {% if item.image_url %}<img class="thumb" src="{{ item.image_url }}" alt="" loading="lazy">
+            {% else %}<span class="thumb thumb-empty">{{ item.name[:1]|upper }}</span>{% endif %}
+          </td>
+          <td>
+            <strong>{{ item.name }}</strong>
+            {% if item.description %}<div class="muted small clamp">{{ item.description }}</div>{% endif %}
+          </td>
+          <td>{{ item.category_name }}</td>
+          <td class="num">₹{{ item.rate|money }}</td>
+          <td class="num">{{ '%g'|format(item.gst) }}%</td>
+          <td>{% if item.veg|string == '1' %}<span class="food veg" title="Veg"></span> VEG{% else %}<span class="food nonveg" title="Non-veg"></span> NON VEG{% endif %}</td>
+          <td>{% if item.active %}<span class="badge badge-green">Show</span>{% else %}<span class="badge badge-grey">Hide</span>{% endif %}</td>
+          <td class="actions-col">
+            <a class="icon-btn" href="{{ url_for('menu.edit', item_id=item.id) }}" title="Edit">{{ icon('edit', 16) }}</a>
+            <form method="post" action="{{ url_for('menu.toggle', item_id=item.id) }}" class="inline">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="icon-btn" type="submit" title="{{ 'Hide from billing' if item.active else 'Make available' }}">{{ icon('eye-off' if item.active else 'eye', 16) }}</button>
+            </form>
+            <form method="post" action="{{ url_for('menu.delete', item_id=item.id) }}" class="inline" data-confirm="Delete '{{ item.name }}'? This cannot be undone.">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="icon-btn danger" type="submit" title="Delete">{{ icon('trash', 16) }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(pager, "items") }}
+  {% else %}
+    <div class="empty">{{ icon('book', 32) }}
+      <p>{% if filters.search or filters.category_id or filters.veg or filters.status %}No items match your filters.{% else %}The menu is empty.{% endif %}</p>
+      <a class="btn btn-primary" href="{{ url_for('menu.create', category=filters.category_id) }}">{{ icon('plus', 16) }} Add Item</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

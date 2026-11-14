@@ -1,0 +1,41 @@
+{% extends "layouts/base.html" %}
+{% block title %}Upload PDF{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Define Menu</span>{% endblock %}
+
+{% block content %}
+<div class="grid-1-2">
+  <form class="card" method="post" enctype="multipart/form-data" novalidate data-busy-on-submit>
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <header class="card-head"><h2>Upload menu PDF</h2></header>
+    <p class="muted">This is the menu customers open from the website and QR code. Uploading replaces the current file; the previous one is kept as a backup.</p>
+    <label class="dropzone {{ 'has-error' if error }}" data-dropzone>
+      {{ icon('upload', 32) }}
+      <strong data-dropzone-label>Choose a PDF or drop it here</strong>
+      <span class="muted small">PDF only, up to {{ config.KS.uploads.max_upload_mb }} MB</span>
+      <input type="file" name="pdf" accept="application/pdf,.pdf" required>
+    </label>
+    {% if error %}<small class="error-text">{{ error }}</small>{% endif %}
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">{{ icon('upload', 16) }} Upload PDF</button>
+    </div>
+  </form>
+
+  <article class="card">
+    <header class="card-head">
+      <h2>Current menu</h2>
+      {% if pdf %}
+      <div class="btn-row">
+        <a class="btn btn-ghost" href="{{ pdf.url }}" target="_blank" rel="noopener">{{ icon('external', 16) }} Open</a>
+        <a class="btn btn-ghost" href="{{ pdf.url }}" download="menu.pdf">{{ icon('download', 16) }} Download</a>
+      </div>
+      {% endif %}
+    </header>
+    {% if pdf %}
+      <p class="muted small">{{ pdf.size_kb }} KB · last updated {{ pdf.modified.strftime('%d %b %Y, %I:%M %p') }}{% if pdf.legacy %} · the old app's shared menu; upload to give this restaurant its own{% endif %}</p>
+      <iframe class="pdf-frame" src="{{ pdf.url }}#view=FitH" title="Menu PDF preview"></iframe>
+    {% else %}
+      <div class="empty">{{ icon('file', 32) }}<p>No menu PDF has been uploaded yet.</p></div>
+    {% endif %}
+  </article>
+</div>
+{% endblock %}

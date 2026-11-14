@@ -1,0 +1,21 @@
+{% extends "layouts/base.html" %}
+{% block title %}Item Summary{% endblock %}
+{% block crumbs %}<a href="{{ url_for('online.index') }}">Online Orders</a> / <span>Item Summary</span>{% endblock %}
+{% block content %}
+<div class="card">
+  <form class="toolbar" method="get">
+    <label class="date-field">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ start.isoformat() }}" aria-label="From"></label>
+    <span class="muted">to</span>
+    <label class="date-field">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ end.isoformat() }}" aria-label="To"></label>
+    <button class="btn btn-primary" type="submit">{{ icon('refresh', 16) }} Show</button>
+    <span class="toolbar-spacer"></span><span class="muted small">Paid, delivered online orders</span>
+  </form>
+  {% if rows %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>SrNo</th><th>Name</th><th class="num">Count</th><th class="num">Amount</th></tr></thead>
+    <tbody>{% for r in rows %}<tr><td class="muted">{{ loop.index }}</td><td>{{ r.name }}</td><td class="num"><strong>{{ r.quantity }}</strong></td><td class="num">₹{{ r.amount|money }}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><td></td><td>Total</td><td class="num">{{ rows|sum(attribute='quantity') }}</td><td class="num">₹{{ rows|sum(attribute='amount')|money }}</td></tr></tfoot>
+  </table></div>
+  {% else %}<div class="empty">{{ icon('box', 30) }}<p>{% if vendor is none %}This restaurant is not linked to the customer app.{% else %}No delivered online orders in this period.{% endif %}</p></div>{% endif %}
+</div>
+{% endblock %}

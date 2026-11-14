@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · Kailash Parvatam</title>
+  <link rel="icon" type="image/png" href="{{ asset('img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+</head>
+<body class="error-page">
+  <main class="error-card">
+    <img class="error-emblem" src="{{ asset('img/kp-emblem.png') }}" alt="">
+    <div class="error-code">{{ status }}</div>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    {% if error_id %}<p class="muted small">Reference: <code>{{ error_id }}</code> (quote this when reporting the problem)</p>{% endif %}
+    <div class="error-actions">
+      <a class="btn btn-ghost" href="javascript:history.back()">{{ icon('arrow-left', 16) }} Go back</a>
+      <a class="btn btn-primary" href="{{ url_for('dashboard.index') }}">Dashboard</a>
+    </div>
+  </main>
+</body>
+</html>

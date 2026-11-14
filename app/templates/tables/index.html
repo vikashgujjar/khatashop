@@ -1,0 +1,110 @@
+{% extends "layouts/base.html" %}
+{% block title %}Table View{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Billing</span>{% endblock %}
+{% block actions %}
+  {% if can('billing') %}
+  <a class="btn btn-ghost" href="{{ url_for('bills.create', order='delivery') }}">{{ icon('truck', 16) }} Delivery</a>
+  <a class="btn btn-ghost" href="{{ url_for('bills.create', order='pickup') }}">{{ icon('bag', 16) }} Pick Up</a>
+  <a class="btn btn-primary" href="{{ url_for('bills.create') }}">{{ icon('plus', 16) }} Quick Bill</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="tv-bar">
+  <ul class="tv-legend" aria-label="Table colours">
+    <li><i class="dot blank"></i> Blank</li>
+    <li><i class="dot running"></i> Running (saved)</li>
+    <li><i class="dot kot"></i> KOT sent (preparing)</li>
+    <li><i class="dot ready"></i> Food ready</li>
+    <li><i class="dot printed"></i> Bill printed</li>
+  </ul>
+  <span class="tv-refresh muted small" id="tv-updated" title="Refreshes every 15 seconds">{{ icon('refresh', 13) }} Live</span>
+  {% if can_manage %}<a class="btn btn-ghost" href="{{ url_for('tables.manage') }}">{{ icon('edit', 15) }} Manage Tables</a>{% endif %}
+</div>
+
+<div id="tv-areas" data-api="{{ url_for('tables.board_json') }}" data-open="{{ url_for('tables.order', table_id=0) }}"></div>
+
+{% if not areas %}
+  <div class="card empty">{{ icon('grid', 32) }}
+    <p>No tables set up yet.{% if not can_manage %} Ask your outlet admin to add tables.{% endif %}</p>
+    {% if can_manage %}<a class="btn btn-primary" href="{{ url_for('tables.manage') }}">{{ icon('plus', 16) }} Add tables</a>{% endif %}
+  </div>
+{% endif %}
+<script type="application/json" id="tv-data">{{ areas|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+  const box = document.getElementById("tv-areas");
+  const labels = {{ status_labels|tojson }};
+  const openBase = box.dataset.open.replace(/\/0$/, "/");
+  const rupees = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function render(areas) {
+    const frag = document.createDocumentFragment();
+    areas.forEach((area) => {
+      const section = document.createElement("section");
+      section.className = "tv-area";
+      const h = document.createElement("h2");
+      h.textContent = area.name;
+      const count = document.createElement("span");
+      const busy = area.tables.filter((t) => t.status !== "blank").length;
+      count.className = "muted small";
+      count.textContent = busy + " / " + area.tables.length + " occupied";
+      h.appendChild(count);
+      const grid = document.createElement("div");
+      grid.className = "tv-grid";
+      area.tables.forEach((t) => {
+        const a = document.createElement("a");
+        a.className = "tv-table " + t.status;
+        a.href = openBase + t.id;
+        a.title = t.name + " - " + labels[t.status];
+        const name = document.createElement("strong");
+        name.textContent = t.name;
+        a.appendChild(name);
+        if (t.status !== "blank") {
+          const time = document.createElement("span");
+          time.className = "tv-time";
+          time.textContent = (t.minutes ?? 0) + " min";
+          const amt = document.createElement("span");
+          amt.className = "tv-amt";
+          amt.textContent = "₹" + rupees(t.amount);
+          a.append(time, amt);
+        } else {
+          const free = document.createElement("span");
+          free.className = "tv-free";
+          free.textContent = "Free";
+          a.appendChild(free);
+        }
+        grid.appendChild(a);
+      });
+      section.append(h, grid);
+      frag.appendChild(section);
+    });
+    box.replaceChildren(frag);
+  }
+
+  try { render(JSON.parse(document.getElementById("tv-data").textContent || "[]")); }
+  catch (err) { console.error(err); }
+
+  const stamp = document.getElementById("tv-updated");
+  async function refresh() {
+    if (document.hidden) return;
+    try {
+      const res = await fetch(box.dataset.api, { headers: { Accept: "application/json" }, credentials: "same-origin" });
+      if (res.status === 401) { location.href = "/login"; return; }
+      const body = await res.json();
+      if (body.ok) { render(body.areas); stamp.classList.remove("stale"); stamp.lastChild.textContent = " Live"; }
+    } catch (err) {
+      console.error(err);
+      stamp.classList.add("stale");
+      stamp.lastChild.textContent = " Offline - retrying";
+    }
+  }
+  setInterval(refresh, 15000);
+  document.addEventListener("visibilitychange", refresh);
+})();
+</script>
+{% endblock %}

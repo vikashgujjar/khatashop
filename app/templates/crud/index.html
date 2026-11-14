@@ -1,0 +1,50 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ res.title }}{% endblock %}
+{% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>{{ res.title }}</span>{% endblock %}
+{% block actions %}{% if can_edit %}<a class="btn btn-primary" href="{{ url_for('crud.create', resource=res.key) }}">{{ icon('plus', 16) }} Add {{ res.singular }}</a>{% endif %}{% endblock %}
+
+{% block content %}
+{% if res.shared_note %}<div class="alert alert-info compact">{{ icon('info', 15) }}<span>{{ res.shared_note }}</span></div>{% endif %}
+<div class="card">
+  {% if res.search %}
+  <form class="toolbar" method="get">
+    <label class="search grow">{{ icon('search', 16) }}<input type="search" name="q" value="{{ q }}" placeholder="Search {{ res.title|lower }}" aria-label="Search"></label>
+    <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Search</button>
+    {% if q %}<a class="link" href="{{ url_for('crud.index', resource=res.key) }}">Clear</a>{% endif %}
+    <span class="toolbar-spacer"></span><span class="muted small">{{ rows|length }} record{{ '' if rows|length == 1 else 's' }}</span>
+  </form>
+  {% endif %}
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>SrNo</th>{% for f in res.fields if f.in_list and f.type != 'password' %}<th class="{{ 'num' if f.type == 'number' }}">{{ f.label }}</th>{% endfor %}<th class="actions-col"></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="{{ 'row-muted' if r.active is defined and r.active == 0 }}">
+          <td class="muted">{{ loop.index }}</td>
+          {% for f in res.fields if f.in_list and f.type != 'password' %}
+            <td class="{{ 'num' if f.type == 'number' }}">
+              {%- if f.type == 'bool' -%}{% if r[f.name] %}<span class="badge badge-green">Yes</span>{% else %}<span class="badge badge-grey">No</span>{% endif %}
+              {%- elif f.type == 'select' -%}{{ r[f.name ~ '__label'] if r[f.name ~ '__label'] is not none else '' }}
+              {%- elif f.type == 'number' -%}{{ '%g'|format(r[f.name]|float) if r[f.name] is not none else '' }}
+              {%- else -%}{{ r[f.name] if r[f.name] is not none else '' }}{%- endif -%}
+            </td>
+          {% endfor %}
+          <td class="actions-col">{% if can_write %}
+            {% if can_edit %}<a class="icon-btn" href="{{ url_for('crud.edit', resource=res.key, record_id=r._id) }}" title="Edit">{{ icon('edit', 16) }}</a>{% endif %}
+            <form method="post" action="{{ url_for('crud.delete', resource=res.key, record_id=r._id) }}" class="inline" data-confirm="Delete this {{ res.singular|lower }}?">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="icon-btn danger" type="submit" title="{{ 'Remove from this restaurant' if res.key == 'drivers' else 'Delete' }}">{{ icon('trash', 16) }}</button>
+            </form>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">{{ icon('box', 30) }}<p>{% if q %}Nothing matches "{{ q }}".{% else %}No {{ res.title|lower }} yet.{% endif %}</p>
+      {% if can_edit %}<a class="btn btn-primary" href="{{ url_for('crud.create', resource=res.key) }}">{{ icon('plus', 16) }} Add {{ res.singular }}</a>{% endif %}</div>
+  {% endif %}
+</div>
+{% endblock %}

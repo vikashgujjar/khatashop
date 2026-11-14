@@ -1,0 +1,54 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit login' if person else 'Add staff login' }}{% endblock %}
+{% block crumbs %}<a href="{{ url_for('admin.restaurants') }}">Restaurants</a> / <a href="{{ url_for('admin.restaurant', company_id=rest.id) }}#staff">{{ rest.name }}</a> / <span>{{ person.name if person else 'New login' }}</span>{% endblock %}
+
+{% block content %}
+<form class="card form-card" method="post" novalidate data-busy-on-submit autocomplete="off">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <label class="field {{ 'has-error' if errors.name }}">
+      <span>Name <em>*</em></span>
+      <input type="text" name="name" value="{{ form.name or '' }}" maxlength="50" required autofocus>
+      {% if errors.name %}<small class="error-text">{{ errors.name }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.email }}">
+      <span>Email (used to sign in) <em>*</em></span>
+      <input type="email" name="email" value="{{ form.email or '' }}" maxlength="100" required autocomplete="off">
+      {% if errors.email %}<small class="error-text">{{ errors.email }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.user_type }}">
+      <span>Role</span>
+      <select name="user_type">
+        {% for code, label in roles.items() %}<option value="{{ code }}" {% if form.user_type|string == code|string %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <small class="hint">Same roles as the old app. Coordinator is the usual outlet admin.</small>
+    </label>
+    <label class="field {{ 'has-error' if errors.contact_no }}">
+      <span>Mobile</span>
+      <input type="tel" name="contact_no" value="{{ form.contact_no or '' }}" maxlength="15">
+      {% if errors.contact_no %}<small class="error-text">{{ errors.contact_no }}</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.password }}">
+      <span>{{ 'New password' if person else 'Password' }} {% if not person %}<em>*</em>{% endif %}</span>
+      <input type="password" name="password" minlength="8" autocomplete="new-password" {% if not person %}required{% endif %}>
+      {% if errors.password %}<small class="error-text">{{ errors.password }}</small>{% else %}<small class="hint">{{ 'Leave empty to keep the current password. ' if person }}At least 8 characters.</small>{% endif %}
+    </label>
+    <label class="field {{ 'has-error' if errors.employee_id }}">
+      <span>Employee ID (attendance machine)</span>
+      <input type="text" name="employee_id" value="{{ form.employee_id if form.employee_id else '' }}" inputmode="numeric" maxlength="8">
+      {% if errors.employee_id %}<small class="error-text">{{ errors.employee_id }}</small>{% else %}<small class="hint">Optional. Links this login to the biometric punches.</small>{% endif %}
+    </label>
+    <label class="field">
+      <span>Status</span>
+      <select name="active">
+        <option value="1" {% if form.active|string == '1' %}selected{% endif %}>Active</option>
+        <option value="0" {% if form.active|string == '0' %}selected{% endif %}>Inactive</option>
+      </select>
+    </label>
+  </div>
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{{ url_for('admin.restaurant', company_id=rest.id) }}#staff">Cancel</a>
+    <button class="btn btn-primary" type="submit">{{ icon('check', 16) }} {{ 'Save' if person else 'Create login' }}</button>
+  </div>
+</form>
+{% endblock %}
