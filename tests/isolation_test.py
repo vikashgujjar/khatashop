@@ -130,7 +130,7 @@ def main():
         check("B still opens its own files", b.get(f"/uploads/category_img/{ids['cat']}.jpg").status_code == 200 and b.get(f"/uploads/menu_pdf/{B}.pdf").status_code == 200)
 
         print("App-wide settings are read-only for restaurants")
-        for url in ["/m/discounts/", "/m/delivery_charges/", "/m/menu_revisions/"]:
+        for url in ["/m/discounts/", "/m/delivery_charges/"]:
             r = a.get(url, follow_redirects=True)
             check(f"{url} viewable, no save button", r.status_code == 200 and b"View only" in r.data or b"Add " not in r.data, r.status_code)
         r = a.post("/m/delivery_charges/new", data={"_csrf": "tok", "from_km": "0", "to_km": "1", "charges": "999"})

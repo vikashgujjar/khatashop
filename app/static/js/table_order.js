@@ -99,7 +99,7 @@
     const box = $("new-lines");
     box.replaceChildren();
     if (!cart.size) return;
-    box.appendChild(el("div", "kot-head new", "New items · not sent yet"));
+    box.appendChild(el("div", "kot-head new", "New items · not sent yet · tap ✎ Note for kitchen instructions"));
     cart.forEach((line, id) => {
       const item = menu.byId.get(id);
       if (!item) return;
@@ -108,10 +108,11 @@
       const info = el("div");
       info.append(el("div", "line-name", item.name));
       const meta = el("div", "line-meta");
-      const noteBtn = el("button", "line-remove", line.note ? "✎ " + line.note : "+ Note");
+      const noteBtn = el("button", "note-btn" + (line.note ? " has-note" : "") + (line.noteOpen ? " open" : ""), line.note ? "✎ " + line.note : "✎ Note");
       noteBtn.type = "button";
       noteBtn.dataset.action = "note";
-      meta.append(document.createTextNode("₹" + rupees(item.ratePaise) + " · "), noteBtn);
+      noteBtn.title = line.note ? "Edit kitchen note" : "Add a kitchen note";
+      meta.append(document.createTextNode("₹" + rupees(item.ratePaise) + " "), noteBtn);
       info.appendChild(meta);
       const stepper = el("div", "stepper");
       stepper.innerHTML =
@@ -128,7 +129,38 @@
       amt.appendChild(rm);
       row.append(info, stepper, amt);
       box.appendChild(row);
+      if (line.noteOpen) box.appendChild(notePanel(id, line, item));
     });
+  }
+
+  // Quick kitchen instructions; tapping a chip adds it to (or removes it from) the note.
+  const NOTE_CHIPS = ["Less spicy", "Extra spicy", "No onion", "No garlic", "Jain", "Less oil", "Extra butter", "Parcel"];
+
+  function notePanel(id, line, item) {
+    const panel = el("div", "note-panel");
+    panel.dataset.id = id;
+    const chips = el("div", "note-chips");
+    const parts = (line.note || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    NOTE_CHIPS.forEach((c) => {
+      const b = el("button", "note-chip" + (parts.includes(c.toLowerCase()) ? " on" : ""), c);
+      b.type = "button";
+      b.dataset.action = "chip";
+      b.dataset.chip = c;
+      chips.appendChild(b);
+    });
+    const input = el("input", "note-input");
+    input.type = "text";
+    input.maxLength = 120;
+    input.placeholder = "Note for the kitchen, e.g. serve with main course";
+    input.value = line.note || "";
+    input.setAttribute("aria-label", "Kitchen note for " + item.name);
+    const done = el("button", "btn btn-ghost note-done", "Done");
+    done.type = "button";
+    done.dataset.action = "note-done";
+    const rowEl = el("div", "note-input-row");
+    rowEl.append(input, done);
+    panel.append(chips, rowEl);
+    return panel;
   }
 
   function renderHeader() {
@@ -177,19 +209,40 @@
   $("new-lines").addEventListener("click", (e) => {
     const action = e.target.closest("[data-action]");
     if (!action) return;
-    const id = Number(action.closest(".line").dataset.id);
+    const id = Number(action.closest("[data-id]").dataset.id);
     const line = cart.get(id);
     if (!line) return;
-    if (action.dataset.action === "inc") line.qty = Math.min(999, line.qty + 1);
-    else if (action.dataset.action === "dec") line.qty -= 1;
-    else if (action.dataset.action === "remove") line.qty = 0;
-    else if (action.dataset.action === "note") {
-      const note = window.prompt("Kitchen note for " + menu.byId.get(id).name + " (e.g. less spicy):", line.note || "");
-      if (note === null) return;
-      line.note = note.trim().slice(0, 120);
+    const kind = action.dataset.action;
+    if (kind === "inc") line.qty = Math.min(999, line.qty + 1);
+    else if (kind === "dec") line.qty -= 1;
+    else if (kind === "remove") line.qty = 0;
+    else if (kind === "note") line.noteOpen = !line.noteOpen;
+    else if (kind === "note-done") line.noteOpen = false;
+    else if (kind === "chip") {
+      const chip = action.dataset.chip;
+      const parts = (line.note || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const at = parts.findIndex((p) => p.toLowerCase() === chip.toLowerCase());
+      if (at >= 0) parts.splice(at, 1); else parts.push(chip);
+      line.note = parts.join(", ").slice(0, 120);
     }
     if (line.qty <= 0) cart.delete(id);
     refresh();
+    if (kind === "note" && line.noteOpen) {
+      const input = $("new-lines").querySelector(`.note-panel[data-id="${id}"] .note-input`);
+      if (input) input.focus();
+    }
+  });
+  // Typing a note updates it without redrawing (keeps the cursor in the box); Enter closes the panel.
+  $("new-lines").addEventListener("input", (e) => {
+    if (!e.target.matches(".note-input")) return;
+    const line = cart.get(Number(e.target.closest("[data-id]").dataset.id));
+    if (line) line.note = e.target.value.slice(0, 120);
+  });
+  $("new-lines").addEventListener("keydown", (e) => {
+    if (!e.target.matches(".note-input") || e.key !== "Enter") return;
+    e.preventDefault();
+    const line = cart.get(Number(e.target.closest("[data-id]").dataset.id));
+    if (line) { line.note = e.target.value.trim().slice(0, 120); line.noteOpen = false; refresh(); }
   });
   $("new-lines").addEventListener("change", (e) => {
     if (!e.target.matches(".stepper input")) return;
@@ -251,7 +304,7 @@
     }
   }
 
-  const cartPayload = () => Array.from(cart, ([item_id, l]) => ({ item_id, quantity: l.qty, note: l.note }));
+  const cartPayload = () => Array.from(cart, ([item_id, l]) => ({ item_id, quantity: l.qty, note: (l.note || "").trim() }));
 
   const backToTables = () => { location.href = root.dataset.tablesUrl; };
 

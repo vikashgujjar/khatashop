@@ -49,7 +49,6 @@ NAV = [
         ("crud.index:vendors", "Vendor Detail", "user", "inventory"),
     ]),
     ("Define Menu", [
-        ("crud.index:menu_revisions", "Menu Revision", "calendar", "menu"),
         ("menu_category.index", "Menu Category", "tag", "menu"),
         ("menu.index", "Menu", "book", "menu"),
         ("menu_pdf.index", "Upload PDF", "file", "menu"),
@@ -96,7 +95,7 @@ ENDPOINT_ACCESS = {
 RESOURCE_ACCESS = {
     "drivers": "online_admin", "discounts": "online_admin", "delivery_charges": "online_admin",
     "ingredients": "inventory", "ingredient_categories": "inventory", "vendors": "inventory",
-    "menu_revisions": "menu", "feedback": "customers", "kpusers": "customers", "procurement": "inventory", "issuing": "issuing", "consumption": "issuing",
+    "feedback": "customers", "kpusers": "customers", "procurement": "inventory", "issuing": "issuing", "consumption": "issuing",
 }
 WAITER_BLOCKED = {"tables.bill", "tables.settle", "tables.cancel"}  # waiters take orders, counters bill
 

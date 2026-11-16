@@ -18,7 +18,7 @@ MODULES = {
     "tables": ("Table service", "Table View, KOT printing, Kitchen screen, Manage Tables", {"tables", "kitchen", "admin_tables"}),
     "online": ("Online orders", "Order Detail, Item Summary, Drivers, Discount, Delivery Charges", {"online", "online_admin"}),
     "inventory": ("Inventory", "Procurement, Issuing, Consumption, Recipes, Ingredients, Vendors", {"inventory", "issuing"}),
-    "menu": ("Menu management", "Menu Category, Menu, Upload PDF, Menu Revision", {"menu"}),
+    "menu": ("Menu management", "Menu Category, Menu, Upload PDF", {"menu"}),
     "staff": ("Staff logins", "Create and manage the restaurant's staff logins", {"staff"}),
     "attendance": ("Attendance", "Monthly attendance from the biometric machine", {"attendance"}),
 }

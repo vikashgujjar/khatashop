@@ -66,7 +66,7 @@ Check: `python tests/api_compat_test.py` (needs both servers running).
 | Procurement / Issuing / Consumption Detail | Inventory | Notes with ingredient lines, numbered like bills, A4 print |
 | Consumption Formula | Inventory → Consumption Formula | Recipe per menu item, feeds Item Consumption |
 | Ingredient, Ingredient Category, Vendor Detail | Inventory | |
-| Menu Revision, Discount, Delivery Charges | Define Menu / Staff & Settings | Shared tables (customer app) |
+| Discount, Delivery Charges | Staff & Settings | Shared tables (customer app) |
 | Counter Manager, Executive, ... | Staff & Settings → Staff Logins | Same role codes; employee ID links attendance |
 | Attendance | Staff & Settings → Attendance | Monthly grid from biometric punches, Excel export |
 
@@ -79,7 +79,7 @@ Admin, Manager and Coordinator see everything for their restaurant.
 `tests/isolation_test.py`). Drivers belong to restaurants through our table `ks_driver_company` (filled from
 delivery history). Each restaurant has its own menu PDF (`uploads/menu_pdf/<id>.pdf`); the old website's shared
 `menupdf.pdf` is updated only by the restaurant set in `uploads.legacy_menu_pdf_company`. Photos, logos and PDFs
-open only for their own restaurant. Discount, Delivery Charges and Menu Revision are single app-wide settings in
+open only for their own restaurant. Discount and Delivery Charges are single app-wide settings in
 the customer app, so restaurants can view them and only super admins can change them.
 
 **Online orders vendor mapping**: `online_orders.vendor_by_company` in db_config.json maps a restaurant

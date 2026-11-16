@@ -161,11 +161,14 @@ def main():
         print("Online orders (test order)")
         with app.app_context():
             now_s = db.fetch_value("SELECT NOW() AS n")
+            # orders.vendor_id has a foreign key to `vendor`; route the test restaurant's online orders
+            # to the vendor row this test created (same mapping mechanism as db_config.json).
+            app.config["KS"].setdefault("online_orders", {}).setdefault("vendor_by_company", {})[str(cid)] = vendor
             _, order_id = db.execute(
                 "INSERT INTO orders (uid, vendor_id, date_time, paid_method, order_to, orders, notes, address, total, tax, discount, delivery_charge, "
                 "grand_total, status, isReady, is_confirmed, payment_status, created_at, updated_at, mobile, name) "
                 "VALUES (0, %s, %s, 'online', 'home', '', %s, 0, 100, 5, 0, 0, 105, %s, 0, 0, 1, %s, %s, '9999999999', 'Test Customer')",
-                (cid, now_s, json.dumps([{"status": 1, "value": "Order Created", "time": "x"}]), json.dumps([{"id": "1", "status": "pending"}]), now_s, now_s))
+                (vendor, now_s, json.dumps([{"status": 1, "value": "Order Created", "time": "x"}]), json.dumps([{"id": "1", "status": "pending"}]), now_s, now_s))
             db.execute("INSERT INTO order_items (order_id, item_id, item_name, quantity, rate, item_gst, total, created_at, updated_at) "
                        "VALUES (%s, %s, 'CHAI', 5, 20, 5, 100, %s, %s)", (order_id, chai, now_s, now_s))
             driver = db.fetch_value("SELECT id FROM drivers ORDER BY id LIMIT 1")

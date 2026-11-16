@@ -20,7 +20,8 @@ API URLs and how each is served: see [API_ENDPOINTS.md](API_ENDPOINTS.md).
 | Issuing | Issuing Detail | Inventory → Issuing | Done |
 | consumption | Consumption Detail | Inventory → Consumption | Done |
 | Consumption Formula | Consumption Formula | Inventory → Consumption Formula | Done |
-| Define Menu | Menu Revision / Menu Category / Menu | Define Menu | Done |
+| Define Menu | Menu Category / Menu | Define Menu | Done |
+| Define Menu | Menu Revision | — | Removed on request (revisions stay in the database; new categories use revision 1 like the old app) |
 | Define Ingredient | Ingredient / Ingredient Category | Inventory | Done |
 | Vendor Detail | Vendor Detail | Inventory → Vendor Detail | Done |
 | Settings | Discount / Delivery Charges | Staff & Settings | Done (app-wide; super admin edits) |

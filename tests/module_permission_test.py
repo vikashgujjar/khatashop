@@ -61,7 +61,7 @@ def main():
         nav = admin.get("/dashboard").data.decode()
         labels = re.findall(r'class="nav-link[^"]*"[^>]*title="([^"]+)"', nav)
         check("admin sidebar shows only Dashboard + Billing + Menu pages", set(labels) == {"Dashboard", "Generate Bill", "Bill Detail", "Daily Sale Consolidated", "Daily Sale", "All Reports",
-              "Feedback Users", "Users", "Menu Revision", "Menu Category", "Menu", "Upload PDF"}, labels)
+              "Feedback Users", "Users", "Menu Category", "Menu", "Upload PDF"}, labels)
         for url in ["/tables", "/kitchen", "/online-orders/", "/inventory/procurement/", "/staff/", "/attendance/", "/m/drivers/"]:
             r = admin.get(url)
             check(f"{url} blocked for restaurant admin", r.status_code == 403 and b"turned off for this restaurant" in r.data, r.status_code)

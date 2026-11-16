@@ -245,8 +245,6 @@ def _ingredient_categories(company_id):
 
 YES_NO = lambda _c: [(1, "Yes"), (0, "No")]  # noqa: E731
 GENDERS = lambda _c: [("Male", "Male"), ("Female", "Female"), ("Other", "Other")]  # noqa: E731
-MONTHS = lambda _c: [(i, m) for i, m in enumerate(["January", "February", "March", "April", "May", "June", "July", "August",
-                                                   "September", "October", "November", "December"], start=1)]  # noqa: E731
 
 SHARED = "App-wide setting used by the customer app for every restaurant. Only a super admin can change it."
 
@@ -287,19 +285,6 @@ RESOURCES = {
         order_by="X.vendor_name", search=["vendor_name", "vendor_contact", "vendor_city", "vendor_gst_no"], unique="vendor_name",
         in_use_sql="SELECT COUNT(*) AS c FROM procurement_note WHERE vendor_id = %s",
         in_use_message="This vendor has {n} procurement note(s) and cannot be deleted.", timestamps=("created", "updated")),
-    "menu_revisions": Resource(
-        super_only_write=True,
-        key="menu_revisions", title="Menu Revision", singular="Menu revision", table="menu_revision", pk="menu_revision_id",
-        fields=[Field("revision_name", "Revision name", required=True, max_len=20),
-                Field("revision_month", "Month", "select", required=True, options=MONTHS),
-                Field("revision_year", "Year", "number", required=True, min_value=2000, max_value=2100, decimals=0),
-                Field("effective_from", "Effective from", "date", required=True),
-                Field("remarks", "Remarks", "textarea", max_len=500),
-                Field("set_as_default", "Default revision", "bool"),
-                Field("active", "Active", "bool", default=1)],
-        order_by="X.revision_year DESC, X.revision_month DESC", search=["revision_name", "remarks"], unique="revision_name",
-        in_use_sql="SELECT COUNT(*) AS c FROM menu_category WHERE menu_revision_id = %s",
-        in_use_message="{n} menu categories use this revision, so it cannot be deleted.", shared_note=SHARED, timestamps=("created", "updated")),
     "drivers": Resource(
         key="drivers", title="Drivers", singular="Driver", table="drivers", pk="id",
         fields=[Field("first_name", "First name", required=True, max_len=100),

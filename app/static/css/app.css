@@ -621,6 +621,21 @@ tr:nth-child(2) .rank { background: var(--sun-50); color: var(--sun-700); }
 .att-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; margin-bottom: 12px; }
 .att-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
+/* Kitchen notes on new table items */
+.note-btn { border: 1px solid #f1e2a2; background: var(--sun-50); color: var(--sun-700); font: 600 11px var(--font); padding: 1px 8px; border-radius: 99px;
+  cursor: pointer; margin-left: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.note-btn:hover, .note-btn.open { background: var(--sun); color: var(--brand-900); border-color: var(--sun); }
+.note-btn.has-note { background: #fff4e0; border-color: #f8d9a8; color: var(--amber); }
+.note-panel { padding: 8px 12px 10px; background: #fffbea; border-bottom: 1px dashed #f1e2a2; display: grid; gap: 8px; }
+.note-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.note-chip { border: 1px solid #e3d9b0; background: #fff; border-radius: 99px; padding: 2px 9px; font: 500 11.5px var(--font); color: var(--ink-2); cursor: pointer; }
+.note-chip:hover { border-color: var(--sun); }
+.note-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.note-input-row { display: flex; gap: 6px; }
+.note-input { flex: 1; min-width: 0; height: 30px; border: 1px solid #d8e0db; border-radius: 7px; padding: 0 8px; font-size: 12.5px; }
+.note-input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-100); }
+.note-done { height: 30px; padding: 0 10px; font-size: 12px; }
+
 /* Kitchen screen */
 .k-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
 .k-title { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--brand-900); margin-bottom: 10px; }
