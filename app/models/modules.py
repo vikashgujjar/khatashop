@@ -35,7 +35,7 @@ def ensure_table() -> None:
         return
     with _lock:
         if not _ready:
-            db.execute(
+            db.create_table(
                 "CREATE TABLE IF NOT EXISTS ks_company_modules ("
                 " company_detail_id INT NOT NULL PRIMARY KEY,"
                 " modules TEXT NOT NULL,"

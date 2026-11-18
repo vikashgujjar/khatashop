@@ -51,20 +51,20 @@ def ensure_schema() -> None:
     with _schema_lock:
         if _schema_ready:
             return
-        db.execute(
+        db.create_table(
             "CREATE TABLE IF NOT EXISTS ks_table_area ("
             " serving_table_id INT NOT NULL PRIMARY KEY,"
             " area VARCHAR(40) NOT NULL,"
             " sort_order INT NOT NULL DEFAULT 0"
             ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         )
-        db.execute(
+        db.create_table(
             "CREATE TABLE IF NOT EXISTS ks_kot_ready ("
             " table_order_id INT NOT NULL PRIMARY KEY,"
             " ready_at DATETIME NOT NULL"
             ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         )
-        db.execute(
+        db.create_table(
             "CREATE TABLE IF NOT EXISTS ks_kot_note ("
             " table_order_detail_id INT NOT NULL PRIMARY KEY,"
             " note VARCHAR(200) NOT NULL"

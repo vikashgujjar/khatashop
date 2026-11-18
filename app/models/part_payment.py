@@ -34,7 +34,7 @@ def ensure_schema() -> None:
     with _schema_lock:
         if _schema_ready:
             return
-        db.execute(
+        db.create_table(
             "CREATE TABLE IF NOT EXISTS ks_bill_payment ("
             " id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
             " bill_id INT NOT NULL,"

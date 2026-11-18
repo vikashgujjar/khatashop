@@ -244,10 +244,16 @@ def run_check() -> None:
         try:
             version = db.fetch_value("SELECT VERSION() AS v")
             bills = db.fetch_value("SELECT COUNT(*) AS c FROM bill")
+            missing = db.missing_app_tables()
         except Exception as exc:  # noqa: BLE001 - report whatever went wrong
             print(f"Database check FAILED: {getattr(exc, 'message', exc)}", file=sys.stderr)
             sys.exit(1)
     print(f"Database OK: {cfg['database']['name']} on {cfg['database']['host']} (server {version}, {bills} bills)")
+    if missing:
+        print(f"App tables MISSING: {', '.join(missing)}\n  Run deploy/001_khatashop_python_tables.sql on this database "
+              "(auto_create_tables is " + ("on" if cfg["database"].get("auto_create_tables") else "off") + ").", file=sys.stderr)
+    else:
+        print("App tables OK: all 8 ks_ tables present")
     upl = Path(cfg["uploads"]["base_dir"])
     print(f"Uploads folder: {upl} ({'found' if upl.is_dir() else 'will be created on first upload'})")
 

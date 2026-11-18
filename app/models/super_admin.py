@@ -40,7 +40,7 @@ def ensure_table() -> None:
         return
     with _ready_lock:
         if not _ready:
-            db.execute(CREATE_SQL)
+            db.create_table(CREATE_SQL)
             _ready = True
 
 

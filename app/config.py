@@ -23,6 +23,7 @@ DEFAULTS = {
         "connect_timeout": 5,
         "read_timeout": 30,
         "write_timeout": 30,
+        "auto_create_tables": False,   # True lets the app create its ks_ tables itself
     },
     "app": {
         "host": "0.0.0.0",

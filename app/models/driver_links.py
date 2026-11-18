@@ -21,7 +21,7 @@ def ensure_table() -> None:
     with _lock:
         if _ready:
             return
-        db.execute(
+        db.create_table(
             "CREATE TABLE IF NOT EXISTS ks_driver_company ("
             " driver_id INT NOT NULL, company_detail_id INT NOT NULL,"
             " PRIMARY KEY (driver_id, company_detail_id)"

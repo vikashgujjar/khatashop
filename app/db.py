@@ -4,6 +4,7 @@ One connection per request (opened lazily, closed on teardown). Statements
 run in autocommit mode unless wrapped in `transaction()`.
 """
 import logging
+import re
 import threading
 from contextlib import contextmanager
 
@@ -140,3 +141,38 @@ def column_exists(table: str, column: str) -> bool:
     with _column_lock:
         _column_cache[key] = exists
     return exists
+
+
+# The app's own tables (ks_...). They are created by deploy/001_khatashop_python_tables.sql.
+APP_TABLES = ("ks_super_admin", "ks_company_modules", "ks_driver_company", "ks_table_area",
+              "ks_kot_note", "ks_kot_ready", "ks_bill_payment", "ks_activity_log")
+_table_cache: set = set()
+
+
+def missing_app_tables() -> list[str]:
+    marks = ",".join(["%s"] * len(APP_TABLES))
+    have = {r["t"] for r in fetch_all(
+        f"SELECT table_name AS t FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ({marks})",
+        APP_TABLES)}
+    return [t for t in APP_TABLES if t not in have]
+
+
+def create_table(ddl: str) -> None:
+    """Runs a CREATE TABLE IF NOT EXISTS only when database.auto_create_tables is true in
+    db_config.json. Otherwise (the default) the app never changes the schema: it only checks
+    the table is there and explains what to run if it is not."""
+    match = re.search(r"CREATE TABLE IF NOT EXISTS\s+`?(\w+)`?", ddl, re.I)
+    name = match.group(1) if match else "?"
+    if name in _table_cache:
+        return
+    if current_app.config["KS"]["database"].get("auto_create_tables"):
+        execute(ddl)
+    elif not fetch_value(
+        "SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s", (name,), 0
+    ):
+        log.error("Table %s is missing and auto_create_tables is off", name)
+        raise DatabaseError(
+            f"The database table '{name}' is missing. Run deploy/001_khatashop_python_tables.sql on this database "
+            "(the app does not create tables by itself)."
+        )
+    _table_cache.add(name)

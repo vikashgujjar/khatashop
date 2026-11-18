@@ -17,6 +17,7 @@ import threading
 from flask import g, request, session
 
 from . import db
+from .errors import DatabaseError
 from .utils import Pagination, now
 
 log = logging.getLogger("khatashop.activity")
@@ -100,7 +101,7 @@ def ensure_schema() -> None:
     with _schema_lock:
         if _schema_ready:
             return
-        db.execute(
+        db.create_table(
             "CREATE TABLE IF NOT EXISTS ks_activity_log ("
             " id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,"
             " created DATETIME NOT NULL,"
@@ -242,6 +243,8 @@ def record(response):
              _clip(request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip(), 45),
              _clip(request.headers.get("User-Agent"), 255)),
         )
+    except DatabaseError as exc:  # e.g. the ks_activity_log table has not been created yet
+        log.warning("Activity not recorded for %s: %s", request.path, exc.message)
     except Exception:  # noqa: BLE001 - the log must never break the page
         log.exception("Could not record activity for %s", request.path)
     return response
