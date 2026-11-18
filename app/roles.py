@@ -27,6 +27,8 @@ NAV = [
         ("reports.index?type=ingredient_stock", "Ingredient Purchase", "download", "reports+inventory"),
         ("reports.index?type=daily_consolidated", "Daily Sale Consolidated", "layers", "reports"),
         ("reports.index?type=daily_sale", "Daily Sale", "calendar", "reports"),
+        ("reports.index?type=gst_monthly", "Monthly GST Report", "percent", "reports"),
+        ("reports.index?type=period_sales", "Quarterly / Yearly Sale", "trend-up", "reports"),
         ("online.index", "Order Detail", "truck", "online"),
         ("online.summary", "Item Summary", "box", "online"),
         ("reports.index?type=online_orders", "Online Orders", "receipt", "reports+online"),
@@ -97,7 +99,7 @@ RESOURCE_ACCESS = {
     "ingredients": "inventory", "ingredient_categories": "inventory", "vendors": "inventory",
     "feedback": "customers", "kpusers": "customers", "procurement": "inventory", "issuing": "issuing", "consumption": "issuing",
 }
-WAITER_BLOCKED = {"tables.bill", "tables.settle", "tables.cancel"}  # waiters take orders, counters bill
+WAITER_BLOCKED = {"tables.bill", "tables.settle", "tables.cancel", "tables.part_payment_add", "tables.part_payment_remove"}  # waiters take orders, counters bill
 
 
 def allowed(key: str, user: dict | None = None) -> bool:
@@ -153,7 +155,7 @@ def _is_active(endpoint: str, resource: str | None, query: dict | None = None) -
         kind = request.args.get("type") or "daily"
         if current not in ("reports.index", "reports.export"):
             return False
-        named = {"item_consumption", "ingredient_stock", "daily_consolidated", "daily_sale", "online_orders"}
+        named = {"item_consumption", "ingredient_stock", "daily_consolidated", "daily_sale", "online_orders", "gst_monthly", "period_sales"}
         return (query or {}).get("type") == kind if query else kind not in named
     current = ACTIVE_ALIASES.get(current, current)
     if resource:

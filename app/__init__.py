@@ -60,13 +60,22 @@ def create_app(config_path=None) -> Flask:
     app.teardown_appcontext(db.close_conn)
     register_error_handlers(app)
 
+    from . import activity
+
     @app.before_request
     def _before():
         if request.blueprint in ("mobile_api", "legacy_api"):
             return  # app-facing API: token auth (checked by the API itself), no browser session / CSRF
         load_user()
+        activity.mark()
         check_csrf()
         roles.check_request()
+
+    @app.after_request
+    def _activity(response):
+        if request.blueprint not in ("mobile_api", "legacy_api", "static"):
+            activity.record(response)
+        return response
 
     @app.after_request
     def _security_headers(response):

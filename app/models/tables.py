@@ -31,7 +31,7 @@ from ..services import billing
 from ..utils import financial_period, now, to_int
 from . import bill as bill_model
 from . import company as company_model
-from . import menu_item, payment
+from . import menu_item, part_payment, payment
 
 log = logging.getLogger("khatashop.models.tables")
 
@@ -279,6 +279,7 @@ def order_state(company_id: int, table_id: int) -> dict:
         bill = db.fetch_one("SELECT bill_id AS id, bill_no, total, customer_name, customer_mb_no FROM bill WHERE bill_id = %s", (bill_id,))
         if bill:
             bill["total"] = float(bill["total"])
+            bill.update(part_payment.summary(bill["id"], bill["total"]))
     o = {"bill_id": bill_id, "unbilled": sum(1 for k in kots if not k["create_bill"]), "unsent": sum(1 for k in kots if not k["kot_status"]),
          "waiting": sum(1 for k in kots if k["kot_status"] and not k["ready_at"])}
     moment = now()
@@ -410,6 +411,7 @@ def _drop_bill_if_empty(cur, company_id: int, table_id: int, bill_id: int) -> No
         cur.execute("SELECT payment_mode_id FROM bill WHERE bill_id = %s", (bill_id,))
         b = cur.fetchone()
         if b and b["payment_mode_id"] == 0:
+            part_payment.delete_for_bill(cur, bill_id)
             cur.execute("DELETE FROM bill_detail WHERE bill_id = %s", (bill_id,))
             cur.execute("DELETE FROM bill WHERE bill_id = %s", (bill_id,))
             log.info("Unpaid table bill %s cancelled because its order is empty", bill_id)
@@ -508,20 +510,53 @@ def print_bill(company_id: int, table_id: int, user_id: int, payload) -> dict:
     return {"bill_id": bill_id, "bill_no": bill_no, "total": float(totals.grand_total), "settled": paid}
 
 
-def settle(company_id: int, table_id: int, payment_mode_id) -> dict:
-    mode_id = _payment_mode(company_id, payment_mode_id)
+def settle(company_id: int, table_id: int, payment_mode_id, user_id: int = 0) -> dict:
+    """Marks the printed bill as paid. With part payments taken, whatever is still due is
+    taken in the chosen mode (none needed when the parts already cover the bill)."""
     state = order_state(company_id, table_id)
-    if not state["bill"]:
+    bill = state["bill"]
+    if not bill:
         raise ValidationError("Print the bill before settling.")
     if state["status"] != "printed":
         raise ValidationError("Items were changed after the bill was printed. Print the bill again before settling.")
+    has_parts = bool(bill.get("payments"))
+    if has_parts and not to_int(payment_mode_id) and bill.get("due", 0) > 0:
+        raise ValidationError(f"₹{bill['due']:,.2f} is still due. Take the rest before settling.")
+    mode_id = _payment_mode(company_id, payment_mode_id) if (not has_parts or to_int(payment_mode_id)) else None
     moment = now()
-    with db.transaction() as cur:
-        cur.execute("UPDATE bill SET payment_mode_id = %s, active = 1, updated = %s WHERE bill_id = %s AND payment_mode_id = 0",
-                    (mode_id, moment, state["bill"]["id"]))
-        cur.execute("UPDATE table_order SET active = 0, updated = %s WHERE company_detail_id = %s AND serving_table_id = %s AND active = 1 AND kot_status IN (0, 1)",
-                    (moment, company_id, table_id))
-    return {"bill_id": state["bill"]["id"], "bill_no": state["bill"]["bill_no"], "total": state["bill"]["total"]}
+    with db.named_lock(f"khatashop_table_{company_id}_{table_id}"):
+        with db.transaction() as cur:
+            split_mode = part_payment.settle_split(cur, company_id, bill["id"], mode_id, user_id)
+            final_mode = split_mode or mode_id
+            if not final_mode:
+                raise ValidationError("Choose how the customer paid.")
+            cur.execute("UPDATE bill SET payment_mode_id = %s, active = 1, updated = %s WHERE bill_id = %s AND payment_mode_id = 0",
+                        (final_mode, moment, bill["id"]))
+            if not cur.rowcount:
+                raise ValidationError("This bill was already settled on another screen.")
+            cur.execute("UPDATE table_order SET active = 0, updated = %s WHERE company_detail_id = %s AND serving_table_id = %s AND active = 1 AND kot_status IN (0, 1)",
+                        (moment, company_id, table_id))
+    log.info("Table %s bill %s settled%s", table_id, bill["bill_no"], " (part payment)" if split_mode else "")
+    return {"bill_id": bill["id"], "bill_no": bill["bill_no"], "total": bill["total"], "part": bool(split_mode)}
+
+
+def add_part_payment(company_id: int, table_id: int, payload: dict, user_id: int) -> None:
+    bill = _printed_bill(company_id, table_id)
+    part_payment.add(company_id, bill["id"], payload.get("payment_mode_id"), payload.get("amount"), user_id)
+
+
+def remove_part_payment(company_id: int, table_id: int, payment_id) -> None:
+    bill = _printed_bill(company_id, table_id)
+    part_payment.remove(company_id, bill["id"], payment_id)
+
+
+def _printed_bill(company_id: int, table_id: int) -> dict:
+    state = order_state(company_id, table_id)
+    if not state["bill"]:
+        raise ValidationError("Print the bill first, then take part payments.")
+    if state["status"] != "printed":
+        raise ValidationError("Items were changed after the bill was printed. Print the bill again, then take the payment.")
+    return state["bill"]
 
 
 def move(company_id: int, from_id: int, to_id: int) -> str:

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, send_file
 
 from ..models import company as company_model
+from .. import date_ranges
 from ..models import report
 from ..security import outlet_required
 from ..services import excel
@@ -23,38 +24,41 @@ def _params():
     kind = request.args.get("type", "daily")
     if not can_view(kind):
         kind = "daily"
-    end = parse_date(request.args.get("date_to")) or today()
-    start = parse_date(request.args.get("date_from")) or end.replace(day=1)
-    note = None
-    if start > end:
-        start, end = end, start
-        note = "The dates were the wrong way round, so they were swapped."
+    # Every report opens on the current quarter; the quarterly / yearly comparison opens on 3 financial years.
+    t = today()
+    default = (report.default_start(kind, t), t) if kind == "period_sales" else "this_quarter"
+    start, end, active, note = date_ranges.resolve(request.args, default)
     if (end - start).days > MAX_DAYS:
         start = end.replace(year=end.year - 3)
+        active = "custom"
         note = "Reports cover at most 3 years; the start date was moved."
-    return kind, start, end, note
+    return kind, start, end, note, active
 
 
 @bp.route("/")
 @outlet_required
 def index():
-    kind, start, end, note = _params()
+    kind, start, end, note, active = _params()
     return render_template(
         "reports/index.html",
-        report=report.build(kind, company_id(), start, end, request.args.get("source", "")),
+        report=report.build(kind, company_id(), start, end, request.args.get("source", ""), request.args.get("period", "")),
         sources=report.SOURCES,
+        periods=report.PERIODS,
         reports={k: v for k, v in report.REPORTS.items() if can_view(k)},
         start=start,
         end=end,
         note=note,
+        active_range=active,
+        range_labels=date_ranges.LABELS,
+        today_iso=today().isoformat(),
     )
 
 
 @bp.route("/export")
 @outlet_required
 def export():
-    kind, start, end, _note = _params()
-    data = report.build(kind, company_id(), start, end, request.args.get("source", ""))
+    kind, start, end, _note, _active = _params()
+    data = report.build(kind, company_id(), start, end, request.args.get("source", ""), request.args.get("period", ""))
     company = company_model.get(company_id())
     title = f"{company['name']} - {data['title']} ({start:%d-%m-%Y} to {end:%d-%m-%Y})"
     return send_file(

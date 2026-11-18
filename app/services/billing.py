@@ -5,7 +5,8 @@ Matches the Angular billing screen:
   * CGST = SGST = round2(total GST / 2)
   * Service charge = subtotal x service-mode % rounded to whole rupees
   * Container charge = % of subtotal or a fixed amount (optional)
-  * Grand total = subtotal + CGST + SGST + service + container
+  * Grand total = subtotal + CGST + SGST + service + container, rounded to whole rupees
+    (half up); the difference is the round-off shown on the bill
 """
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
@@ -45,6 +46,7 @@ class BillTotals:
     container_charges: Decimal
     grand_total: Decimal
     total_quantity: int
+    round_off: Decimal = ZERO
 
 
 def container_amount(subtotal: Decimal, mode: str | None, value: Decimal) -> Decimal:
@@ -64,7 +66,8 @@ def calculate(lines: list[BillLine], service_percent=ZERO, container_mode: str |
     half = round2(gst_sum / 2)
     service = (subtotal * Decimal(str(service_percent)) / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     container = container_amount(subtotal, container_mode, Decimal(str(container_value)))
-    grand = round2(subtotal + half + half + service + container)
+    exact = round2(subtotal + half + half + service + container)
+    grand = exact.quantize(Decimal("1"), rounding=ROUND_HALF_UP).quantize(Decimal("0.01"))
     return BillTotals(
         lines=lines,
         subtotal=subtotal,
@@ -75,6 +78,7 @@ def calculate(lines: list[BillLine], service_percent=ZERO, container_mode: str |
         container_charges=container,
         grand_total=grand,
         total_quantity=sum(line.quantity for line in lines),
+        round_off=grand - exact,
     )
 
 

@@ -19,6 +19,10 @@
 
   const payButtons = Array.from(root.querySelectorAll("[data-pay]"));
   let payMode = payButtons.length ? Number(payButtons[0].dataset.pay) : null;
+  const payModes = JSON.parse(($("pay-modes-data") || {}).textContent || "[]");
+  let lastError = "";
+  const toPaise = (r) => Math.round(Number(r || 0) * 100);
+  const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   const menu = KS.PosMenu({
     root,
@@ -54,7 +58,9 @@
     const sel = $("service-mode");
     const pct = sel ? Number(sel.selectedOptions[0].dataset.percent || 0) : 0;
     const service = roundHalfUp((subtotal * pct) / 100 / 100) * 100;
-    return { subtotal, half, gst: half * 2, service, count, grand: subtotal + half * 2 + service };
+    const exact = subtotal + half * 2 + service;
+    const grand = KS.roundRupee(exact);
+    return { subtotal, half, gst: half * 2, service, count, grand, roundOff: grand - exact };
   }
 
   // ---- Rendering -----------------------------------------------------------
@@ -99,7 +105,7 @@
     const box = $("new-lines");
     box.replaceChildren();
     if (!cart.size) return;
-    box.appendChild(el("div", "kot-head new", "New items · not sent yet · tap ✎ Note for kitchen instructions"));
+    // box.appendChild(el("div", "kot-head new", "New items · not sent yet · tap ✎ Note for kitchen instructions"));
     cart.forEach((line, id) => {
       const item = menu.byId.get(id);
       if (!item) return;
@@ -182,6 +188,7 @@
     $("t-gst").textContent = "₹" + rupees(t.gst);
     if ($("t-service")) $("t-service").textContent = "₹" + rupees(t.service);
     $("t-grand").textContent = "₹" + rupees(t.grand);
+    if ($("row-roundoff")) { $("row-roundoff").hidden = t.roundOff === 0; $("t-roundoff").textContent = KS.signedRupees(t.roundOff); }
 
     const hasSent = state.kots.length > 0;
     const unsentSaved = state.kots.some((k) => !k.printed);
@@ -191,10 +198,82 @@
     $("act-bill").disabled = busy || (!hasSent && cart.size === 0);
     $("act-bill").lastChild.textContent = state.status === "printed" || state.bill ? " Reprint Bill" : " Print Bill";
     $("act-bill").hidden = !canBill;
-    $("act-settle").hidden = !canBill || !(state.status === "printed" && cart.size === 0);
-    $("act-settle").disabled = busy || !payMode;
+    const printed = state.status === "printed" && cart.size === 0;
+    const parts = (state.bill && state.bill.payments) || [];
+    const due = state.bill ? toPaise(state.bill.due != null ? state.bill.due : state.bill.total) : 0;
+    $("act-settle").hidden = !canBill || !printed;
+    $("act-settle").disabled = busy || (!payMode && !(parts.length && due === 0));
+    $("act-settle").lastChild.textContent = parts.length ? (due > 0 ? " Settle ₹" + rupees(due) : " Settle") : " Settle";
+    $("act-settle").title = parts.length && due > 0 ? "Take the remaining ₹" + rupees(due) + " by the selected mode and settle" : "Mark the printed bill as paid";
+    if ($("pay-part")) {
+      $("pay-part").hidden = !canBill;
+      $("pay-part").disabled = busy;
+      $("pay-part").classList.toggle("active", parts.length > 0);
+    }
+    renderParts(parts, due);
     $("to-move").disabled = busy || !hasSent;
     if ($("to-cancel")) $("to-cancel").disabled = busy || !hasSent;
+  }
+
+  // Part payments already taken on the printed bill (like "Paid via UPI ₹300 / Not paid ₹200").
+  function renderParts(parts, due) {
+    const box = $("part-box");
+    if (!box) return;
+    box.hidden = !parts.length;
+    if (!parts.length) return;
+    $("part-list").innerHTML = parts.map((p) =>
+      `<li><span>${esc(p.time)} · Paid via ${esc(p.mode)}</span><strong>₹${rupees(toPaise(p.amount))}</strong></li>`
+    ).join("") + `<li class="${due > 0 ? "due" : "done"}"><span>${due > 0 ? "Not paid" : "Fully paid"}</span><strong>₹${rupees(Math.max(due, 0))}</strong></li>`;
+  }
+
+  function partList() {
+    return ((state.bill && state.bill.payments) || []).map((p) => ({ id: p.id, mode: p.mode, amount: toPaise(p.amount), time: p.time }));
+  }
+
+  function failed() { const e = new Error(lastError); e.userMessage = lastError || "Something went wrong. Nothing was changed."; throw e; }
+
+  /** Part payment works straight from the order: new items are saved and the bill is brought
+   *  up to date in the background (nothing is printed, the screen stays open). */
+  async function openPart() {
+    showError("");
+    if (!state.kots.length && !cart.size) { showError("Add items to the order first."); return; }
+    const phone = phoneOk();
+    if (phone === null) return;
+    if (cart.size) {
+      const saved = await call("/kot", { items: cartPayload(), print: false }, $("pay-part"));
+      if (!saved) return;
+      cart.clear();
+      refresh();
+    }
+    if (!state.bill || state.status !== "printed") {
+      const body = await call("/bill", {
+        paid: false,
+        service_mode_id: $("service-mode") ? $("service-mode").value || null : null,
+        customer_name: $("customer-name").value.trim(),
+        customer_phone: phone,
+      }, $("pay-part"));
+      if (!body) return;
+    }
+    KS.PartPay.open({
+      title: "Bill No: " + state.bill.bill_no + " · Table " + state.table.name,
+      modes: payModes,
+      total: toPaise(state.bill.total),
+      payments: partList(),
+      finishLabel: "Settle",
+      onAdd: async (modeId, paise) => (await call("/part-payment", { payment_mode_id: modeId, amount: (paise / 100).toFixed(2) })) ? partList() : failed(),
+      onRemove: async (id) => (await call("/part-payment/remove", { payment_id: id })) ? partList() : failed(),
+      onFinish: async () => {
+        const body = await call("/settle", { payment_mode_id: null });
+        if (!body) failed();
+        settled(body);
+        return true;
+      },
+    });
+  }
+
+  function settled(body) {
+    KS.toast("Bill " + body.bill.bill_no + " settled" + (body.bill.part ? " (part payment)" : "") + " · ₹" + rupees(Math.round(body.bill.total * 100)), "success");
+    setTimeout(backToTables, 900);
   }
 
   function refresh() {
@@ -263,6 +342,8 @@
 
   // ---- Server calls --------------------------------------------------------
   function showError(msg) {
+    lastError = msg;
+    if (msg && KS.PartPay && KS.PartPay.isOpen()) return; // the part payment window shows it
     $("cart-error").textContent = msg;
     $("cart-error").hidden = !msg;
   }
@@ -342,17 +423,23 @@
       customer_phone: phone,
     }, $("act-bill"));
     if (!body) return;
-    KS.toast("Bill " + body.bill.bill_no + " printed. Open the table and press Settle when the customer pays.", "success");
-    KS.printUrl(body.print_url, backToTables);
+    KS.toast("Bill " + body.bill.bill_no + " printed. Press Settle when the customer pays.", "success");
+    KS.printUrl(body.print_url, null); // stay on the table; only Save, KOT & Print and Settle go back to Table View
   }
 
   async function settleBill() {
-    if (!payMode) { showError("Choose how the customer paid."); return; }
+    const parts = (state.bill && state.bill.payments) || [];
+    const due = state.bill ? toPaise(state.bill.due) : 0;
+    if (!payMode && !(parts.length && due === 0)) { showError("Choose how the customer paid."); return; }
+    if (parts.length && due > 0) {
+      const name = (payModes.find((m) => m.id === payMode) || {}).name || "the selected mode";
+      if (!window.confirm("Take the remaining ₹" + rupees(due) + " by " + name + " and settle the bill?")) return;
+    }
     const body = await call("/settle", { payment_mode_id: payMode }, $("act-settle"));
-    if (!body) return;
-    KS.toast("Bill " + body.bill.bill_no + " settled · ₹" + rupees(Math.round(body.bill.total * 100)), "success");
-    setTimeout(backToTables, 900);
+    if (body) settled(body);
   }
+  if ($("pay-part")) $("pay-part").addEventListener("click", openPart);
+  if ($("part-edit")) $("part-edit").addEventListener("click", openPart);
 
   $("act-save").addEventListener("click", () => sendKot(false, $("act-save"), true));
   $("act-kot").addEventListener("click", () => sendKot(true, $("act-kot"), true));
@@ -379,8 +466,9 @@
   });
   if ($("to-cancel")) {
     $("to-cancel").addEventListener("click", async () => {
-      if (!window.confirm("Cancel the whole order on this table? Items sent to the kitchen and any unpaid bill will be removed.")) return;
-      if (await call("/cancel", {}, $("to-cancel"))) { cart.clear(); KS.toast("Order cancelled.", "success"); setTimeout(() => (location.href = root.dataset.tablesUrl), 800); }
+      const taken = state.bill && state.bill.paid ? " The part payments taken (₹" + rupees(toPaise(state.bill.paid)) + ") will be removed too, so return that money to the customer." : "";
+      if (!window.confirm("Cancel the whole order on this table? Items sent to the kitchen and any unpaid bill will be removed." + taken)) return;
+      if (await call("/cancel", {}, $("to-cancel"))) { cart.clear(); refresh(); KS.toast("Order cancelled. The table is free.", "success"); }
     });
   }
 

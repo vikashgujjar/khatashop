@@ -1,0 +1,19 @@
+{# Quick date ranges + custom dates. Include inside a GET <form>; needs start, end, active_range, range_labels. #}
+{# Pressing Enter in a date box submits the typed dates, not the first quick range. #}
+<button type="submit" name="range" value="custom" class="sr-only" tabindex="-1" aria-hidden="true">Apply</button>
+<div class="range-row">
+  <div class="range-chips" role="group" aria-label="Quick date range">
+  {% for key, label in range_labels.items() %}
+    <button type="submit" name="range" value="{{ key }}" class="range-chip{% if active_range == key %} active{% endif %}"
+            aria-pressed="{{ 'true' if active_range == key else 'false' }}">{{ label }}</button>
+  {% endfor %}
+  <span class="range-chip range-custom{% if active_range == 'custom' %} active{% endif %}" aria-hidden="true">Custom</span>
+  </div>
+  <span class="range-dates">
+    <label class="date-field" title="From date">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ start.isoformat() }}" max="{{ today_iso }}" aria-label="From date"></label>
+    <span class="muted">to</span>
+    <label class="date-field" title="To date">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ end.isoformat() }}" aria-label="To date"></label>
+    <button class="btn btn-ghost range-apply" type="submit" name="range" value="custom" title="Show the report for these dates">Apply dates</button>
+  </span>
+</div>
+<p class="range-caption muted small">{{ start.strftime('%d %b %Y') }} – {{ end.strftime('%d %b %Y') }}{% if active_range != 'custom' %} · {{ range_labels[active_range] }}{% endif %}</p>

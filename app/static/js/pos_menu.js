@@ -15,8 +15,11 @@
     const [whole, frac] = v.split(".");
     const last3 = whole.slice(-3);
     const rest = whole.slice(0, -3);
-    return (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," : "") + last3 + "." + frac;
+    return (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," : "") + last3 + (frac === "00" ? "" : "." + frac);
   };
+  /** Grand total rounded to whole rupees (half up), like the server. */
+  KS.roundRupee = (paise) => KS.roundHalfUp(paise / 100) * 100;
+  KS.signedRupees = (paise) => (paise < 0 ? "−₹" : "+₹") + KS.rupees(Math.abs(paise));
 
   /** Prints a page (receipt or KOT) through a hidden iframe.
    *  onDone runs once the print dialog has closed (or after 60 s at the latest),

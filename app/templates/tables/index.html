@@ -40,7 +40,7 @@
   const box = document.getElementById("tv-areas");
   const labels = {{ status_labels|tojson }};
   const openBase = box.dataset.open.replace(/\/0$/, "/");
-  const rupees = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const rupees = (n) => Math.round(Number(n || 0)).toLocaleString("en-IN"); // whole rupees, like the rounded bill
 
   function render(areas) {
     const frag = document.createDocumentFragment();

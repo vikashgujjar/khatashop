@@ -1,4 +1,5 @@
 """Builds the bill list as an .xlsx workbook."""
+import re
 from io import BytesIO
 
 from openpyxl import Workbook
@@ -75,11 +76,18 @@ def bills_workbook(bills: list[dict], title: str) -> BytesIO:
     return buffer
 
 
+def _text(value):
+    """Text that starts with '=' would be stored as an Excel formula; keep it as plain text."""
+    if isinstance(value, str) and value.startswith("="):
+        return "'" + value
+    return value
+
+
 def report_workbook(report: dict, title: str) -> BytesIO:
     """Any report from models.report as a formatted sheet with a totals row."""
     wb = Workbook()
     ws = wb.active
-    ws.title = report["title"][:31]
+    ws.title = re.sub(r"[\\/*?:\[\]]", "-", report["title"])[:31] or "Report"  # Excel forbids \ / * ? : [ ]
     ws.append([title])
     ws["A1"].font = Font(bold=True, size=13)
     ws.append([label for _k, label, _t in report["columns"]])
@@ -88,8 +96,8 @@ def report_workbook(report: dict, title: str) -> BytesIO:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = fill
     for row in report["rows"]:
-        ws.append([_num(row[k]) if kind != "text" else row[k] for k, _l, kind in report["columns"]])
-    if report["rows"]:
+        ws.append([_num(row[k]) if kind != "text" else _text(row[k]) for k, _l, kind in report["columns"]])
+    if report["rows"] and not report.get("no_totals"):
         ws.append([("Total" if i == 0 else (_num(report["totals"][k]) if k in report["totals"] else ""))
                    for i, (k, _l, _kind) in enumerate(report["columns"])])
         for cell in ws[ws.max_row]:

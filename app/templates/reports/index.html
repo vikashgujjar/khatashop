@@ -2,29 +2,32 @@
 {% block title %}Reports{% endblock %}
 {% block crumbs %}<a href="{{ url_for('dashboard.index') }}">Dashboard</a> / <span>Reports</span>{% endblock %}
 {% block actions %}
-  <a class="btn btn-success" href="{{ url_for('reports.export', type=report.kind, date_from=start.isoformat(), date_to=end.isoformat(), source=report.source or None) }}">{{ icon('excel', 16) }} Export Excel</a>
+  <a class="btn btn-success" href="{{ url_for('reports.export', type=report.kind, date_from=start.isoformat(), date_to=end.isoformat(), source=report.source or None, period=report.period) }}">{{ icon('excel', 16) }} Export Excel</a>
 {% endblock %}
 
 {% block content %}
 <div class="report-tabs" role="tablist">
   {% for key, label in reports.items() %}
     <a class="chip{% if key == report.kind %} active{% endif %}" role="tab" aria-selected="{{ 'true' if key == report.kind else 'false' }}"
-       href="{{ url_for('reports.index', type=key, date_from=start.isoformat(), date_to=end.isoformat()) }}">{{ label }}</a>
+       href="{{ url_for('reports.index', type=key) if key == 'period_sales' or report.kind == 'period_sales' else (url_for('reports.index', type=key, range=active_range) if active_range != 'custom' else url_for('reports.index', type=key, date_from=start.isoformat(), date_to=end.isoformat())) }}">{{ label }}</a>
   {% endfor %}
 </div>
 
 <div class="card">
   <form class="toolbar" method="get">
     <input type="hidden" name="type" value="{{ report.kind }}">
-    <label class="date-field" title="From date">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ start.isoformat() }}" aria-label="From date"></label>
-    <span class="muted">to</span>
-    <label class="date-field" title="To date">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ end.isoformat() }}" aria-label="To date"></label>
+    {% include "partials/date_range.html" %}
     {% if report.has_source %}
     <select name="source" aria-label="Orders" data-autosubmit>
       {% for k, v in sources.items() %}<option value="{{ k }}" {% if report.source == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
     </select>
     {% endif %}
-    <button class="btn btn-primary" type="submit">{{ icon('refresh', 16) }} Show report</button>
+    {% if report.period %}
+    <div class="segmented" role="radiogroup" aria-label="Group by">
+      {% for k, v in periods.items() %}<button type="submit" name="period" value="{{ k }}" class="{{ 'active' if report.period == k }}" role="radio" aria-checked="{{ 'true' if report.period == k else 'false' }}">{{ v }}</button>{% endfor %}
+    </div>
+    {% endif %}
+    <button class="btn btn-primary" type="submit"{% if report.period %} name="period" value="{{ report.period }}"{% endif %}>{{ icon('refresh', 16) }} Show report</button>
     <span class="toolbar-spacer"></span>
     <span class="muted small">{{ report.rows|length }} row{{ '' if report.rows|length == 1 else 's' }}</span>
   </form>
@@ -38,7 +41,7 @@
         {% for row in report.rows %}
         <tr>
           {% for key, label, kind in report.columns %}
-            <td class="{{ 'num' if kind != 'text' }}">{% if key == 'source' %}<span class="badge {{ 'badge-rose' if row[key] == 'Online' else 'badge-grey' }}">{{ row[key] }}</span>{% elif kind == 'money' %}{{ row[key]|money }}{% elif kind == 'int' %}{{ "{:,}".format((row[key] or 0)|int) }}{% elif kind == 'qty' %}{{ '%g'|format((row[key] or 0)|float|round(3)) }}{% else %}{{ row[key] if row[key] is not none else '' }}{% endif %}</td>
+            <td class="{{ 'num' if kind != 'text' }}{{ ' nowrap' if key in ('period', 'month', 'growth') }}">{% if key == 'source' %}<span class="badge {{ 'badge-rose' if row[key] == 'Online' else 'badge-grey' }}">{{ row[key] }}</span>{% elif key == 'growth' and row[key] %}<span class="{{ 'growth-up' if row[key].startswith('+') else 'growth-down' }}">{{ row[key] }}</span>{% elif kind == 'money' %}{{ row[key]|money }}{% elif kind == 'int' %}{{ "{:,}".format((row[key] or 0)|int) }}{% elif kind == 'qty' %}{{ '%g'|format((row[key] or 0)|float|round(3)) }}{% else %}{{ row[key] if row[key] is not none else '' }}{% endif %}</td>
           {% endfor %}
         </tr>
         {% endfor %}

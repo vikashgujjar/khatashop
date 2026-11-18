@@ -4,12 +4,10 @@
 {% block content %}
 <div class="card">
   <form class="toolbar" method="get">
-    <label class="date-field">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ start.isoformat() }}" aria-label="From"></label>
-    <span class="muted">to</span>
-    <label class="date-field">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ end.isoformat() }}" aria-label="To"></label>
-    <button class="btn btn-primary" type="submit">{{ icon('refresh', 16) }} Show</button>
+    {% include "partials/date_range.html" %}
     <span class="toolbar-spacer"></span><span class="muted small">Paid, delivered online orders</span>
   </form>
+  {% if range_note %}<div class="alert alert-info compact">{{ icon('info', 16) }}<span>{{ range_note }}</span></div>{% endif %}
   {% if rows %}
   <div class="table-wrap"><table class="table">
     <thead><tr><th>SrNo</th><th>Name</th><th class="num">Count</th><th class="num">Amount</th></tr></thead>

@@ -73,6 +73,7 @@
           {% for m in payment_modes %}
             <button type="button" class="pay{% if loop.first %} active{% endif %}" data-pay="{{ m.id }}" role="radio" aria-checked="{{ 'true' if loop.first else 'false' }}">{{ m.name }}</button>
           {% endfor %}
+            <button type="button" class="pay pay-part" id="pay-part" title="Split the bill: part by cash, part by UPI…">Part</button>
         </div>
       </div>
       {% else %}
@@ -121,6 +122,7 @@
         </div>
         <span id="t-container">₹0.00</span>
       </div>
+      <div class="tot-row" id="row-roundoff" hidden><span>Round off</span><span id="t-roundoff">₹0</span></div>
       <div class="grand"><span>Grand Total</span><strong id="t-grand">₹0.00</strong></div>
       <button type="button" class="btn btn-primary btn-block save-btn" id="save-bill" disabled>{{ icon('printer', 17) }} Save &amp; Print <kbd>Ctrl ↵</kbd></button>
       <p class="error-text center" id="cart-error" hidden></p>
@@ -129,4 +131,4 @@
 </div>
 <script type="application/json" id="menu-data">{{ categories|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="{{ asset('js/pos_menu.js') }}"></script><script src="{{ asset('js/billing.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ asset('js/pos_menu.js') }}"></script><script src="{{ asset('js/part_pay.js') }}"></script><script src="{{ asset('js/billing.js') }}"></script>{% endblock %}

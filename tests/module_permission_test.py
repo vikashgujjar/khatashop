@@ -60,7 +60,7 @@ def main():
             s[CSRF_SESSION_KEY] = "t"
         nav = admin.get("/dashboard").data.decode()
         labels = re.findall(r'class="nav-link[^"]*"[^>]*title="([^"]+)"', nav)
-        check("admin sidebar shows only Dashboard + Billing + Menu pages", set(labels) == {"Dashboard", "Generate Bill", "Bill Detail", "Daily Sale Consolidated", "Daily Sale", "All Reports",
+        check("admin sidebar shows only Dashboard + Billing + Menu pages", set(labels) == {"Dashboard", "Generate Bill", "Bill Detail", "Daily Sale Consolidated", "Daily Sale", "Monthly GST Report", "Quarterly / Yearly Sale", "All Reports",
               "Feedback Users", "Users", "Menu Category", "Menu", "Upload PDF"}, labels)
         for url in ["/tables", "/kitchen", "/online-orders/", "/inventory/procurement/", "/staff/", "/attendance/", "/m/drivers/"]:
             r = admin.get(url)

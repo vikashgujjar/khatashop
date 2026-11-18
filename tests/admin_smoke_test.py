@@ -159,15 +159,15 @@ def main():
         body = r.get_json()
         check("bill saved with first number", r.status_code == 201 and body["bill_no"] == f"{abbr}01", body)
         H = {"X-CSRF-Token": token}
-        line = [{"item_id": item["item_id"], "quantity": 2}]  # 2 x 15 = 30 + 5% GST = 31.50
+        line = [{"item_id": item["item_id"], "quantity": 2}]  # 2 x 15 = 30 + 5% GST = 31.50 -> rounded 32
         r = c.post("/api/bills", headers=H, json={"items": line, "payment_mode_id": mode, "order_type": "delivery",
                                                    "container": {"enabled": True, "mode": "percent", "value": 10}})
         delivery = r.get_json()
-        check("delivery bill adds 10% container (31.50 + 3.00)", r.status_code == 201 and delivery["total"] == 34.5, delivery)
+        check("delivery bill adds 10% container (31.50 + 3.00 = 34.50 -> 35)", r.status_code == 201 and delivery["total"] == 35.0, delivery)
         r = c.post("/api/bills", headers=H, json={"items": line, "payment_mode_id": mode, "order_type": "dine_in",
                                                    "container": {"enabled": True, "mode": "percent", "value": 10}})
         dine = r.get_json()
-        check("dine-in ignores container charges", r.status_code == 201 and dine["total"] == 31.5, dine)
+        check("dine-in ignores container charges (31.50 -> 32)", r.status_code == 201 and dine["total"] == 32.0, dine)
         r = c.post("/api/bills", headers=H, json={"items": line, "payment_mode_id": mode, "order_type": ["x"]})
         check("unknown order type rejected", r.status_code == 422, r.status_code)
         with app.app_context():

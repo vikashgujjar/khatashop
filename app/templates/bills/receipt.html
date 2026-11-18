@@ -51,8 +51,15 @@
       <div><span>SGST</span><span>{{ bill.sgst }}</span></div>
       {% if bill.service_cost and bill.service_cost|float > 0 %}<div><span>Service charge</span><span>{{ bill.service_cost|money }}</span></div>{% endif %}
       {% if bill.container_charges and bill.container_charges|float > 0 %}<div><span>Container charges</span><span>{{ bill.container_charges|money }}</span></div>{% endif %}
+      {% set parts = (bill.subtotal|float) + (bill.cgst|float) + (bill.sgst|float) + (bill.service_cost|float) + ((bill.container_charges or 0)|float) %}
+      {% set round_off = (bill.total|float) - parts %}
+      {% if round_off|abs >= 0.005 and round_off|abs < 1 %}<div><span>Round off</span><span>{{ '+' if round_off > 0 else '−' }}{{ round_off|abs|money }}</span></div>{% endif %}
       <div class="r-grand"><span>Grand Total</span><span>₹{{ bill.total|money }}</span></div>
-      {% if bill.payment_mode %}<div><span>Paid by</span><span>{{ bill.payment_mode }}</span></div>{% endif %}
+      {% if bill.payments %}
+        {% for p in bill.payments %}<div><span>Paid via {{ p.mode }}</span><span>{{ p.amount|money }}</span></div>{% endfor %}
+        {% set due = (bill.total|float) - (bill.payments|sum(attribute='amount')) %}
+        {% if due > 0.004 %}<div><span>Not paid</span><span>{{ due|money }}</span></div>{% endif %}
+      {% elif bill.payment_mode %}<div><span>Paid by</span><span>{{ bill.payment_mode }}</span></div>{% endif %}
     </div>
 
     <footer class="r-foot">

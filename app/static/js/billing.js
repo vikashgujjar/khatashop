@@ -46,7 +46,9 @@
       const value = Math.max(0, Number($("container-value").value) || 0);
       container = state.containerMode === "percent" ? roundHalfUp((subtotal * value) / 100) : roundHalfUp(value * 100);
     }
-    return { subtotal, cgst: half, sgst: half, gst: half * 2, service, container, count, grand: subtotal + half * 2 + service + container };
+    const exact = subtotal + half * 2 + service + container;
+    const grand = KS.roundRupee(exact);
+    return { subtotal, cgst: half, sgst: half, gst: half * 2, service, container, count, grand, roundOff: grand - exact };
   }
 
   // ---- Rendering -----------------------------------------------------------
@@ -106,6 +108,7 @@
     $("t-service").textContent = "₹" + rupees(t.service);
     $("t-container").textContent = "₹" + rupees(t.container);
     $("t-grand").textContent = "₹" + rupees(t.grand);
+    if ($("row-roundoff")) { $("row-roundoff").hidden = t.roundOff === 0; $("t-roundoff").textContent = KS.signedRupees(t.roundOff); }
     $("save-bill").disabled = cart.size === 0 || !payMode || state.saving;
     saveDraft();
   }
@@ -179,7 +182,9 @@
   );
 
   // ---- Validation & saving -------------------------------------------------
+  let lastError = "";
   function showError(msg) {
+    lastError = msg;
     const el = $("cart-error");
     el.textContent = msg;
     el.hidden = !msg;
@@ -191,17 +196,18 @@
 
   $("customer-phone").addEventListener("input", () => $("customer-phone").parentElement.classList.remove("invalid"));
 
-  async function save() {
-    if (state.saving) return;
+  /** Saves the bill. `parts` = [{mode_id, amount (paise)}] for a part payment. Returns true when saved. */
+  async function save(parts) {
+    if (state.saving) return false;
     showError("");
-    if (cart.size === 0) { showError("Add at least one item."); return; }
-    if (!payMode) { showError("Choose a payment mode."); return; }
+    if (cart.size === 0) { showError("Add at least one item."); return false; }
+    if (!payMode && !parts) { showError("Choose a payment mode."); return false; }
     const phone = cleanPhone();
     if (phone && !/^\+?\d{10,14}$/.test(phone)) {
       $("customer-phone").parentElement.classList.add("invalid");
       showError("Enter a valid mobile number (10 digits) or leave it empty.");
-      $("customer-phone").focus();
-      return;
+      if (!parts) $("customer-phone").focus();
+      return false;
     }
     const containerOn = state.orderType !== "dine_in" && $("container-on").checked;
     const payload = {
@@ -213,6 +219,11 @@
       customer_name: $("customer-name").value.trim(),
       customer_phone: phone,
     };
+    if (parts) {
+      payload.part = true;
+      payload.payment_mode_id = null;
+      payload.payments = parts.map((p) => ({ payment_mode_id: p.mode_id, amount: (p.amount / 100).toFixed(2) }));
+    }
 
     const btn = $("save-bill");
     state.saving = true;
@@ -231,19 +242,19 @@
       console.error(err);
       finishSaving();
       showError("Could not reach the server. Check the connection and try again. The bill was not saved.");
-      return;
+      return false;
     }
     finishSaving();
 
     if (res.status === 401) {
       KS.toast("Your session has ended. Please sign in again.", "error");
       setTimeout(() => (window.location.href = "/login?next=" + encodeURIComponent(location.pathname)), 1200);
-      return;
+      return false;
     }
     if (!res.ok || !body.ok) {
       showError((body && body.error) || "The bill could not be saved (error " + res.status + ").");
       if (body && body.error_id) console.error("Server error reference:", body.error_id);
-      return;
+      return false;
     }
 
     const receipt = root.dataset.receiptUrl.replace(/\/0$/, "/" + body.bill_id);
@@ -251,7 +262,36 @@
     resetBill(body.next_bill_no);
     // After printing, go back to the Table View.
     KS.printUrl(receipt + "?embed=1", () => { location.href = root.dataset.doneUrl; });
+    return true;
   }
+
+  // ---- Part payment: split the bill across modes before saving -------------
+  const payModes = payButtons.map((b) => ({ id: Number(b.dataset.pay), name: b.textContent.trim() }));
+  function openPart() {
+    showError("");
+    if (cart.size === 0) { showError("Add at least one item."); return; }
+    let parts = [];
+    let seq = 0;
+    const view = () => parts.map((p) => ({ id: p.id, mode: p.mode, amount: p.amount }));
+    KS.PartPay.open({
+      title: "Bill No: " + $("bill-no").textContent.trim(),
+      modes: payModes,
+      total: totals().grand,
+      payments: [],
+      finishLabel: "Save bill",
+      onAdd: async (modeId, paise) => {
+        const mode = payModes.find((m) => m.id === modeId);
+        parts.push({ id: ++seq, mode_id: modeId, mode: mode ? mode.name : "", amount: paise });
+        return view();
+      },
+      onRemove: async (id) => { parts = parts.filter((p) => p.id !== id); return view(); },
+      onFinish: async () => {
+        if (await save(parts)) return true;
+        const e = new Error(lastError); e.userMessage = lastError; throw e;
+      },
+    });
+  }
+  if ($("pay-part")) $("pay-part").addEventListener("click", openPart);
 
   function finishSaving() {
     state.saving = false;
@@ -270,8 +310,9 @@
     menu.focusSearch();
   }
 
-  $("save-bill").addEventListener("click", save);
+  $("save-bill").addEventListener("click", () => save());
   document.addEventListener("keydown", (e) => {
+    if (KS.PartPay && KS.PartPay.isOpen()) return;
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); save(); }
   });
 

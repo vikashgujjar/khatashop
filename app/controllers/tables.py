@@ -117,8 +117,22 @@ def bill(table_id):
 @bp.route("/api/tables/<int:table_id>/settle", methods=["POST"])
 @outlet_required
 def settle(table_id):
-    result = tables.settle(company_id(), table_id, _json_body().get("payment_mode_id"))
+    result = tables.settle(company_id(), table_id, _json_body().get("payment_mode_id"), user_id())
     return _with_state(table_id, bill=result)
+
+
+@bp.route("/api/tables/<int:table_id>/part-payment", methods=["POST"])
+@outlet_required
+def part_payment_add(table_id):
+    tables.add_part_payment(company_id(), table_id, _json_body(), user_id())
+    return _with_state(table_id)
+
+
+@bp.route("/api/tables/<int:table_id>/part-payment/remove", methods=["POST"])
+@outlet_required
+def part_payment_remove(table_id):
+    tables.remove_part_payment(company_id(), table_id, _json_body().get("payment_id"))
+    return _with_state(table_id)
 
 
 @bp.route("/api/tables/<int:table_id>/move", methods=["POST"])

@@ -32,7 +32,8 @@
     {% if is_super %}
       {% set nav = [("Super Admin", [
         {"url": url_for('admin.restaurants'), "label": "Restaurants", "icon": "layers", "active": active_endpoint.startswith('admin.restaurant')},
-        {"url": url_for('admin.super_admins'), "label": "Super Admins", "icon": "user", "active": active_endpoint.startswith('admin.super_admin')}])] %}
+        {"url": url_for('admin.super_admins'), "label": "Super Admins", "icon": "user", "active": active_endpoint.startswith('admin.super_admin')},
+        {"url": url_for('admin.activity_log'), "label": "Activity Log", "icon": "book", "active": active_endpoint.startswith('admin.activity')}])] %}
     {% endif %}
     {% set nav = nav + outlet_nav() %}
     {% if is_super and current_user.company_id %}

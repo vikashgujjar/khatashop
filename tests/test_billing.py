@@ -23,16 +23,33 @@ class TotalsMatchExistingBills(unittest.TestCase):
         self.assertEqual(t.subtotal, D("109.00"))
         self.assertEqual(t.cgst, D("2.73"))
         self.assertEqual(t.sgst, D("2.73"))
-        self.assertEqual(t.grand_total, D("114.46"))
+        self.assertEqual(t.grand_total - t.round_off, D("114.46"))  # same as the old bill before rounding
+        self.assertEqual((t.grand_total, t.round_off), (D("114.00"), D("-0.46")))
         self.assertEqual(t.total_quantity, 9)
 
     def test_op14(self):  # 2 milk shakes -> 4.20, CGST 0.10
         t = calculate([line(2, 1, item_id=1), line(2, 1, item_id=2)])
-        self.assertEqual((t.grand_total, t.cgst), (D("4.20"), D("0.10")))
+        self.assertEqual((t.grand_total - t.round_off, t.cgst), (D("4.20"), D("0.10")))
+        self.assertEqual(t.grand_total, D("4.00"))
 
     def test_op13(self):  # 1 plain tea -> 15.76, CGST 0.38
         t = calculate([line(15, 1)])
-        self.assertEqual((t.grand_total, t.cgst), (D("15.76"), D("0.38")))
+        self.assertEqual((t.grand_total - t.round_off, t.cgst), (D("15.76"), D("0.38")))
+        self.assertEqual(t.grand_total, D("16.00"))
+
+
+class RoundOff(unittest.TestCase):
+    def test_rounds_down_below_half(self):  # 289 + 14.46 GST = 303.46 -> 303
+        t = calculate([line(40, 1), line(249, 1)])
+        self.assertEqual((t.grand_total, t.round_off), (D("303.00"), D("-0.46")))
+
+    def test_half_rounds_up(self):  # 10 + 0.50 GST = 10.50 -> 11
+        t = calculate([line(10, 1)])
+        self.assertEqual((t.grand_total, t.round_off), (D("11.00"), D("0.50")))
+
+    def test_whole_amount_has_no_round_off(self):
+        t = calculate([line(20, 1)])  # 21.00
+        self.assertEqual((t.grand_total, t.round_off), (D("21.00"), D("0.00")))
 
 
 class Charges(unittest.TestCase):

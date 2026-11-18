@@ -5,15 +5,15 @@
 {% block content %}
 <div class="card oo-filter">
   <form class="toolbar wrap" method="get">
+    {% include "partials/date_range.html" %}
     <label class="search grow">{{ icon('search', 16) }}<input type="search" name="q" value="{{ q }}" placeholder="Order no, customer or mobile" aria-label="Search"></label>
     <select name="status" aria-label="Status" data-autosubmit><option value="">All statuses</option>
       {% for k, v in statuses.items() %}<option value="{{ k }}" {% if status == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
-    <label class="date-field" title="From">{{ icon('calendar', 14) }}<input type="date" name="date_from" value="{{ start.isoformat() }}" aria-label="From"></label>
-    <label class="date-field" title="To">{{ icon('calendar', 14) }}<input type="date" name="date_to" value="{{ end.isoformat() }}" aria-label="To"></label>
     <button class="btn btn-ghost" type="submit">{{ icon('filter', 16) }} Filter</button>
     <span class="chip chip-brand">{{ icon('cart', 14) }} Total Orders: {{ data.count }}</span>
     <span class="chip">Overall Orders: {{ "{:,}".format(data.overall) }}</span>
   </form>
+  {% if range_note %}<div class="alert alert-info compact">{{ icon('info', 16) }}<span>{{ range_note }}</span></div>{% endif %}
 </div>
 
 {% if data.vendor is none %}

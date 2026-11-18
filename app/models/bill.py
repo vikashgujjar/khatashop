@@ -14,7 +14,7 @@ from ..errors import NotFoundError, ValidationError
 from ..services import billing
 from ..utils import Pagination, financial_period, now, parse_date, to_decimal, to_int
 from . import company as company_model
-from . import menu_item, payment
+from . import menu_item, part_payment, payment
 
 log = logging.getLogger("khatashop.models.bill")
 
@@ -56,8 +56,10 @@ def _where(company_id: int, filters: dict):
         params.append(order_type)
     payment_mode_id = to_int(filters.get("payment_mode_id"))
     if payment_mode_id:
-        sql += " AND B.payment_mode_id = %s"
-        params.append(payment_mode_id)
+        part_payment.ensure_schema()
+        sql += (" AND (B.payment_mode_id = %s OR EXISTS (SELECT 1 FROM ks_bill_payment P "
+                "WHERE P.bill_id = B.bill_id AND P.payment_mode_id = %s))")
+        params += [payment_mode_id, payment_mode_id]
     date_from, date_to = parse_date(filters.get("date_from")), parse_date(filters.get("date_to"))
     if date_from:
         sql += " AND B.billing_date >= %s"
@@ -105,6 +107,7 @@ def paginate(company_id: int, filters: dict, page: int, per_page: int):
         params + [pager.per_page, pager.offset],
     )
     _attach_items(bills)
+    part_payment.apply_labels(bills)
     return bills, pager, summary
 
 
@@ -112,6 +115,7 @@ def export_rows(company_id: int, filters: dict, limit: int = 100_000) -> list[di
     where, params = _where(company_id, filters)
     bills = db.fetch_all(f"SELECT {BILL_FIELDS} {where} ORDER BY B.bill_id DESC LIMIT %s", params + [limit])
     _attach_items(bills)
+    part_payment.apply_labels(bills)
     return bills
 
 
@@ -141,6 +145,9 @@ def get(company_id: int, bill_id: int) -> dict:
         subtotal += item["amount"]
     bill["subtotal"] = subtotal
     bill["order_type_label"] = ORDER_TYPE_LABELS.get(bill.get("order_type"), "Dine-in")
+    bill["payments"] = part_payment.for_bill(bill_id)
+    if bill["payments"] and bill["payment_mode_id"]:
+        bill["payment_mode"] = part_payment.label(bill["payments"])
     return bill
 
 
@@ -194,11 +201,27 @@ def _parse_payload(company_id: int, payload) -> dict:
             raise ValidationError(f"Quantity per item cannot be more than {billing.MAX_QUANTITY}.")
 
     modes = {m["id"]: m for m in payment.payment_modes(company_id)}
-    payment_mode_id = to_int(payload.get("payment_mode_id"))
     if not modes:
         raise ValidationError("No payment modes are set up for your company. Ask the administrator to add them.")
-    if payment_mode_id not in modes:
-        errors["payment_mode_id"] = "Choose a payment mode."
+    parts = []
+    if payload.get("part"):
+        raw_parts = payload.get("payments")
+        if not isinstance(raw_parts, list) or not raw_parts:
+            errors["payments"] = "Add the amounts paid by each mode."
+        elif len(raw_parts) > part_payment.MAX_PARTS:
+            errors["payments"] = f"A bill can be split into at most {part_payment.MAX_PARTS} payments."
+        else:
+            for entry in raw_parts:
+                mode = to_int(entry.get("payment_mode_id")) if isinstance(entry, dict) else None
+                if mode not in modes:
+                    errors["payments"] = "One of the part payments has no valid payment mode."
+                    break
+                parts.append((mode, part_payment.parse_amount(entry.get("amount"))))
+        payment_mode_id = None
+    else:
+        payment_mode_id = to_int(payload.get("payment_mode_id"))
+        if payment_mode_id not in modes:
+            errors["payment_mode_id"] = "Choose a payment mode."
 
     service_percent = Decimal("0")
     service_mode_id = to_int(payload.get("service_mode_id"))
@@ -241,6 +264,7 @@ def _parse_payload(company_id: int, payload) -> dict:
     return {
         "quantities": quantities,
         "payment_mode_id": payment_mode_id,
+        "parts": parts,
         "service_percent": service_percent,
         "container_mode": container_mode,
         "container_value": container_value or Decimal("0"),
@@ -275,6 +299,17 @@ def create(company_id: int, user_id: int, payload) -> dict:
         for item_id, qty in data["quantities"].items()
     ]
     totals = billing.calculate(lines, data["service_percent"], data["container_mode"], data["container_value"])
+
+    if data["parts"]:
+        paid = sum((amount for _mode, amount in data["parts"]), Decimal("0"))
+        if paid != totals.grand_total:
+            raise ValidationError(
+                f"The part payments add up to ₹{paid:,.2f} but the bill is ₹{totals.grand_total:,.2f}. "
+                "Make them equal to the bill total.", errors={"payments": "Mismatch."})
+        by_mode: dict[int, Decimal] = {}
+        for mode, amount in data["parts"]:
+            by_mode[mode] = by_mode.get(mode, Decimal("0")) + amount
+        data["payment_mode_id"] = max(by_mode, key=by_mode.get)
 
     moment = now()
     session_year, quarter = financial_period(moment.date())
@@ -323,5 +358,7 @@ def create(company_id: int, user_id: int, payload) -> dict:
                     for l in lines
                 ],
             )
+            if data["parts"]:
+                part_payment.save_for_new_bill(cur, company_id, bill_id, data["parts"], user_id)
     log.info("Bill %s (id %s) saved by user %s: total %s", bill_no, bill_id, user_id, totals.grand_total)
     return {"bill_id": bill_id, "bill_no": bill_no, "total": float(totals.grand_total)}

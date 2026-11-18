@@ -21,7 +21,24 @@ REPORTS = {
     "online_orders": "Online orders",
     "ingredient_stock": "Ingredient purchase & stock",
     "item_consumption": "Item consumption (by recipe)",
+    "gst_monthly": "Monthly GST (CGST / SGST)",
+    "period_sales": "Quarterly / yearly sales",
 }
+PERIODS = {"quarter": "Quarterly", "year": "Yearly"}
+QUARTER_MONTHS = {1: "Apr-Jun", 2: "Jul-Sep", 3: "Oct-Dec", 4: "Jan-Mar"}
+MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def fy_start(day: date) -> date:
+    """1 April of the Indian financial year that `day` falls in."""
+    return date(day.year if day.month >= 4 else day.year - 1, 4, 1)
+
+
+def default_start(kind: str, end: date) -> date | None:
+    """Reports over a longer span open on a longer range."""
+    if kind == "period_sales":
+        return fy_start(end).replace(year=fy_start(end).year - 2)  # this FY and the two before
+    return None
 
 # kind "qty" = quantity with up to 3 decimals (ingredients are measured in KG, LTR, ...)
 COUNTER_NAME = ("COALESCE(AR.name, IF(B.counter_no = 0, 'Super admin', CONCAT('Counter ', B.counter_no)))")
@@ -95,13 +112,16 @@ def _daily_consolidated(company_id, start, end, source=""):
     row per day for paid customer-app orders. (The PHP version had Cash/UPI ids of one restaurant hard-coded.)"""
     from . import payment
 
+    from . import part_payment
+
     modes = payment.payment_modes(company_id)
+    split_join, split_expr = part_payment.mode_columns_join([m["id"] for m in modes])
     columns = [("day", "Billing Date", "text"), ("source", "Source", "text"), ("counter", "Counter", "text"), ("bills", "Bills / Orders", "int")]
     cases = []
     for m in modes:
         key = f"mode_{m['id']}"
         columns.append((key, m["name"], "money"))
-        cases.append(f"SUM(CASE WHEN B.payment_mode_id = {int(m['id'])} THEN B.total ELSE 0 END) AS {key}")
+        cases.append(f"SUM({split_expr[int(m['id'])]}) AS {key}")
     columns += [("online_pay", "Online (app)", "money"), ("discount", "Discount", "money"), ("gst", "GST", "money"), ("total", "Total Sales", "money")]
     rows = []
     if source in ("", "offline"):
@@ -109,7 +129,7 @@ def _daily_consolidated(company_id, start, end, source=""):
             f"SELECT B.billing_date AS day, 'Offline' AS source, {COUNTER_NAME} AS counter, COUNT(*) AS bills, "
             + "".join(c + ", " for c in cases)
             + f"0 AS online_pay, 0 AS discount, SUM({GST_SUM}) AS gst, SUM(B.total) AS total "
-            "FROM bill B LEFT JOIN aspirant_registration AR ON AR.aspirant_registration_id = B.counter_no "
+            f"FROM bill B LEFT JOIN aspirant_registration AR ON AR.aspirant_registration_id = B.counter_no {split_join} "
             f"WHERE {BILLS.split('WHERE ', 1)[1]} GROUP BY B.billing_date, B.counter_no, AR.name",
             (company_id, start, end))
     vendor = _online_vendor(company_id)
@@ -223,18 +243,133 @@ def _item_consumption(company_id, start, end):
     return columns, rows
 
 
-SOURCE_REPORTS = {"daily_sale", "daily_consolidated"}
+def _gst_monthly(company_id, start, end, source=""):
+    """GST per month and tax rate, ready for GSTR-1 / GSTR-3B. Counter and table bills are taken
+    line by line (each item carries its own GST %); customer-app orders by order."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    columns = [("month", "Month", "text"), ("source", "Source", "text"), ("rate", "GST rate", "text"), ("bills", "Bills / Orders", "int"),
+               ("taxable", "Taxable value", "money"), ("cgst", "CGST", "money"), ("sgst", "SGST", "money"),
+               ("gst", "Total GST", "money"), ("total", "Invoice value", "money")]
+    rows = []
+    if source in ("", "offline"):
+        lo, hi = _bill_range(company_id, start, end)
+        if lo is not None:
+            # The CGST / SGST printed on each bill are what was charged; they are shared across the
+            # bill's tax rates in proportion to each rate's line GST, so the report matches the invoices.
+            line_gst = "ROUND(BD.rate * BD.quantity * BD.item_gst / 100, 2)"
+            rows += db.fetch_all(
+                "SELECT y, m, 'Offline' AS source, pct, COUNT(DISTINCT bill_id) AS bills, SUM(taxable) AS taxable, "
+                "SUM(IF(all_gst > 0, hc * gst / all_gst, IF(rates = 1, hc, 0))) AS cgst, "
+                "SUM(IF(all_gst > 0, hs * gst / all_gst, IF(rates = 1, hs, 0))) AS sgst FROM ("
+                " SELECT B.bill_id, YEAR(B.billing_date) AS y, MONTH(B.billing_date) AS m, BD.item_gst AS pct, "
+                f" SUM(BD.rate * BD.quantity) AS taxable, SUM({line_gst}) AS gst, T.all_gst, T.rates, "
+                " CAST(B.cgst AS DECIMAL(12,2)) AS hc, CAST(B.sgst AS DECIMAL(12,2)) AS hs "
+                " FROM bill_detail BD JOIN bill B ON B.bill_id = BD.bill_id "
+                f" JOIN (SELECT BD.bill_id, SUM({line_gst}) AS all_gst, COUNT(DISTINCT BD.item_gst) AS rates FROM bill_detail BD "
+                "       WHERE BD.bill_id BETWEEN %s AND %s GROUP BY BD.bill_id) T ON T.bill_id = B.bill_id "
+                " WHERE BD.bill_id BETWEEN %s AND %s AND B.company_detail_id = %s AND B.payment_mode_id <> 0 "
+                " AND B.billing_date BETWEEN %s AND %s GROUP BY B.bill_id, BD.item_gst"
+                ") X GROUP BY y, m, pct",
+                (lo, hi, lo, hi, company_id, start, end))
+    vendor = _online_vendor(company_id)
+    if source in ("", "online") and vendor is not None:
+        # Online: taxable = items total - discount, GST = tax; the rate is worked out per order.
+        rows += db.fetch_all(
+            "SELECT y, m, 'Online' AS source, pct, COUNT(*) AS bills, SUM(taxable) AS taxable, SUM(gst) AS gst FROM ("
+            " SELECT YEAR(O.created_at) AS y, MONTH(O.created_at) AS m, COALESCE(O.total, 0) - COALESCE(O.discount, 0) AS taxable, "
+            " COALESCE(O.tax, 0) AS gst, IF(COALESCE(O.total, 0) - COALESCE(O.discount, 0) > 0, "
+            "    ROUND(COALESCE(O.tax, 0) * 100 / (COALESCE(O.total, 0) - COALESCE(O.discount, 0))), 0) AS pct "
+            " FROM orders O WHERE O.vendor_id = %s AND " + ONLINE_OK + " AND O.created_at BETWEEN %s AND %s"
+            ") X GROUP BY y, m, pct",
+            (vendor, *_day_range(start, end)))
+    two = Decimal("0.01")
+    for r in rows:
+        taxable = Decimal(str(r["taxable"] or 0)).quantize(two)
+        if "cgst" in r:   # offline: from the bills
+            r["cgst"] = Decimal(str(r["cgst"] or 0)).quantize(two, rounding=ROUND_HALF_UP)
+            r["sgst"] = Decimal(str(r["sgst"] or 0)).quantize(two, rounding=ROUND_HALF_UP)
+        else:             # online: the order's tax, split half and half
+            tax = Decimal(str(r["gst"] or 0)).quantize(two)
+            r["cgst"] = (tax / 2).quantize(two, rounding=ROUND_HALF_UP)
+            r["sgst"] = tax - r["cgst"]
+        r["gst"] = r["cgst"] + r["sgst"]
+        r["taxable"], r["total"] = taxable, taxable + r["gst"]
+        r["_key"] = (r["y"], r["m"], r["source"] == "Online", float(r["pct"] or 0))
+        r["month"] = f"{MONTH_NAMES[r['m'] - 1]} {r['y']}"
+        r["rate"] = "{:g}%".format(float(r["pct"] or 0))
+    rows.sort(key=lambda r: r["_key"])
+    return columns, rows
 
 
-def build(kind: str, company_id: int, start: date, end: date, source: str = "") -> dict:
+def _period_sales(company_id, start, end, source="", period="quarter"):
+    """Sales per financial-year quarter (Q1 = Apr-Jun) or per financial year, with growth
+    against the previous period of the same source."""
+    from decimal import Decimal
+
+    container = "COALESCE(B.container_charges, 0)" if db.column_exists("bill", "container_charges") else "0"
+    columns = [("period", "Quarter" if period == "quarter" else "Financial year", "text"), ("source", "Source", "text"),
+               ("bills", "Bills / Orders", "int"), ("quantity", "Items sold", "int"), ("taxable", "Sales before GST", "money"),
+               ("discount", "Discount", "money"), ("cgst", "CGST", "money"), ("sgst", "SGST", "money"),
+               ("extra", "Other charges", "money"), ("total", "Total sales", "money"), ("growth", "Growth", "text")]
+    fy = "YEAR({d}) - (MONTH({d}) < 4)"
+    qtr = "MOD(MONTH({d}) + 8, 12) DIV 3 + 1"
+    rows = []
+    if source in ("", "offline"):
+        d = "B.billing_date"
+        q = qtr.format(d=d) if period == "quarter" else "0"
+        rows += db.fetch_all(
+            f"SELECT {fy.format(d=d)} AS fy, {q} AS q, 'Offline' AS source, COUNT(*) AS bills, "
+            "SUM(CAST(B.total_quantity AS DECIMAL(10,0))) AS quantity, 0 AS discount, "
+            "SUM(CAST(B.cgst AS DECIMAL(10,2))) AS cgst, SUM(CAST(B.sgst AS DECIMAL(10,2))) AS sgst, "
+            f"SUM(B.service_cost + {container}) AS extra, SUM(B.total) AS total "
+            f"FROM {BILLS} GROUP BY fy, q",
+            (company_id, start, end))
+    vendor = _online_vendor(company_id)
+    if source in ("", "online") and vendor is not None:
+        d = "O.created_at"
+        q = qtr.format(d=d) if period == "quarter" else "0"
+        rows += db.fetch_all(
+            f"SELECT {fy.format(d=d)} AS fy, {q} AS q, 'Online' AS source, COUNT(*) AS bills, "
+            "SUM((SELECT SUM(quantity) FROM order_items I WHERE I.order_id = O.order_id)) AS quantity, "
+            "SUM(COALESCE(O.discount, 0)) AS discount, SUM(COALESCE(O.tax, 0)) / 2 AS cgst, SUM(COALESCE(O.tax, 0)) / 2 AS sgst, "
+            "SUM(COALESCE(O.delivery_charge, 0) + COALESCE(O.container_charges, 0)) AS extra, SUM(COALESCE(O.grand_total, 0)) AS total "
+            "FROM orders O WHERE O.vendor_id = %s AND " + ONLINE_OK + " AND O.created_at BETWEEN %s AND %s GROUP BY fy, q",
+            (vendor, *_day_range(start, end)))
+    two = Decimal("0.01")
+    for r in rows:
+        for k in ("discount", "cgst", "sgst", "extra", "total"):
+            r[k] = Decimal(str(r[k] or 0)).quantize(two)
+        r["fy"], r["q"] = int(r["fy"]), int(r["q"])
+        r["taxable"] = r["total"] - r["cgst"] - r["sgst"] - r["extra"]
+        label = f"FY {r['fy']}-{str(r['fy'] + 1)[-2:]}"
+        # Quarters of the Indian financial year; Jan-Mar (Q4) falls in the next calendar year.
+        r["period"] = (f"Q{r['q']} · {QUARTER_MONTHS[r['q']]} {r['fy'] + (1 if r['q'] == 4 else 0)}"
+                       if period == "quarter" else label)
+    rows.sort(key=lambda r: (r["fy"], r["q"], r["source"] == "Online"))
+    last = {}
+    for r in rows:
+        prev = last.get(r["source"])
+        r["growth"] = "{:+.1f}%".format(float((r["total"] - prev) * 100 / prev)) if prev else ""
+        last[r["source"]] = r["total"]
+    return columns, rows
+
+
+SOURCE_REPORTS = {"daily_sale", "daily_consolidated", "gst_monthly", "period_sales"}
+
+
+def build(kind: str, company_id: int, start: date, end: date, source: str = "", period: str = "quarter") -> dict:
     if kind not in REPORTS:
         kind = "daily"
     params = (company_id, start, end)
     source = source if source in SOURCES else ""
+    period = period if period in PERIODS else "quarter"
 
-    builders = {"daily_sale": _daily_sale, "daily_consolidated": _daily_consolidated,
+    builders = {"daily_sale": _daily_sale, "daily_consolidated": _daily_consolidated, "gst_monthly": _gst_monthly,
                 "ingredient_stock": _ingredient_stock, "item_consumption": _item_consumption, "online_orders": _online_orders}
-    if kind in SOURCE_REPORTS:
+    if kind == "period_sales":
+        columns, rows = _period_sales(company_id, start, end, source, period)
+    elif kind in SOURCE_REPORTS:
         columns, rows = builders[kind](company_id, start, end, source)
     elif kind in builders:
         columns, rows = builders[kind](company_id, start, end)
@@ -274,13 +409,15 @@ def build(kind: str, company_id: int, start: date, end: date, source: str = "") 
 
     elif kind == "payments":
         columns = [("name", "Payment mode", "text"), ("bills", "Bills", "int"), ("gst", "GST", "money"), ("total", "Total", "money")]
+        from . import part_payment  # a part-paid bill counts under each of its modes
+
+        lines = part_payment.mode_lines("B.company_detail_id = %s AND B.payment_mode_id <> 0 AND B.billing_date BETWEEN %s AND %s")
         rows = db.fetch_all(
-            "SELECT COALESCE(PM.payment_mode, 'Other') AS name, COUNT(*) AS bills, "
-            f"SUM({GST_SUM}) AS gst, SUM(B.total) AS total FROM bill B "
-            "LEFT JOIN bill_payment_mode PM ON PM.payment_mode_id = B.payment_mode_id "
-            "WHERE B.company_detail_id = %s AND B.payment_mode_id <> 0 AND B.billing_date BETWEEN %s AND %s "
+            "SELECT COALESCE(PM.payment_mode, 'Other') AS name, COUNT(DISTINCT L.bill_id) AS bills, "
+            f"SUM(L.gst) AS gst, SUM(L.amount) AS total FROM {lines} L "
+            "LEFT JOIN bill_payment_mode PM ON PM.payment_mode_id = L.mode_id "
             "GROUP BY name ORDER BY total DESC",
-            params,
+            list(params) * 2,
         )
 
     elif kind == "order_types":
@@ -306,6 +443,10 @@ def build(kind: str, company_id: int, start: date, end: date, source: str = "") 
             params,
         )
 
-    title = REPORTS[kind] + (f" - {SOURCES[source]}" if kind in SOURCE_REPORTS and source else "")
+    if kind == "period_sales":
+        title = f"{PERIODS[period]} sales" + (f" - {SOURCES[source]}" if source else "")
+    else:
+        title = REPORTS[kind] + (f" - {SOURCES[source]}" if kind in SOURCE_REPORTS and source else "")
     return {"kind": kind, "title": title, "columns": columns, "rows": rows, "totals": _totals(rows, columns),
-            "source": source, "has_source": kind in SOURCE_REPORTS}
+            "source": source, "has_source": kind in SOURCE_REPORTS,
+            "period": period if kind == "period_sales" else None}

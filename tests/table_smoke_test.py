@@ -112,7 +112,7 @@ def main():
         r = c.post(base2 + "/settle", headers=H, json={"payment_mode_id": cash})
         check("settle blocked until reprint", r.status_code == 422 and "again" in r.get_json()["error"])
         b2b = c.post(base2 + "/bill", headers=H, json={"paid": True, "payment_mode_id": cash}).get_json()["bill"]
-        check("reprint keeps bill number, new total 94.50", b2b["bill_no"] == b2["bill_no"] and b2b["total"] == 94.5 and b2b["settled"], (b2, b2b))
+        check("reprint keeps bill number, new total 94.50 -> 95", b2b["bill_no"] == b2["bill_no"] and b2b["total"] == 95.0 and b2b["settled"], (b2, b2b))
         with app.app_context():
             nos = [r["bill_no"] for r in db.fetch_all("SELECT bill_no FROM bill WHERE company_detail_id=%s ORDER BY bill_id", (company_id,))]
         check("no duplicate bill numbers across table + quick bills", len(nos) == len(set(nos)) and quick["bill_no"] in nos, nos)
@@ -145,7 +145,7 @@ def main():
         check("used table cannot be deleted", c.post(f"/tables/manage/{tid['AC1']}/delete", data={"_csrf": token}).status_code == 302
               and "AC1" in str(c.get("/api/tables").get_json()))
         daily = c.get("/reports/?type=daily").data
-        check("reports include only settled bills (147 + 94.50 + 21)", b"262.50" in daily)
+        check("reports include only settled bills (147 + 95 + 21)", b"263.00" in daily)
     finally:
         with app.app_context():
             if company_id:

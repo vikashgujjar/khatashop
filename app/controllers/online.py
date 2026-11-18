@@ -7,30 +7,29 @@ from ..errors import ValidationError
 from ..models import company as company_model
 from ..models import online_orders as orders
 from ..security import outlet_required
-from ..utils import parse_date, today
+from .. import date_ranges
+from ..utils import today
 from .helpers import company_id
 
 bp = Blueprint("online", __name__, url_prefix="/online-orders")
 
 
-def _range():
-    end = parse_date(request.args.get("date_to")) or today()
-    start = parse_date(request.args.get("date_from")) or (end - timedelta(days=1))
-    if start > end:
-        start, end = end, start
-    if (end - start).days > 92:
-        start = end - timedelta(days=92)
-    return start, end
+def _range(default="this_quarter"):
+    """(start, end, extra template values) from the quick range / custom dates; at most 93 days."""
+    start, end, active, note = date_ranges.resolve(request.args, default, max_days=92)
+    return start, end, {"active_range": active, "range_labels": date_ranges.LABELS, "range_note": note,
+                        "today_iso": today().isoformat()}
 
 
 @bp.route("/")
 @outlet_required
 def index():
-    start, end = _range()
+    # Order Detail is the live order screen, so it still opens on yesterday + today.
+    start, end, extra = _range((today() - timedelta(days=1), today()))
     status = request.args.get("status", "")
     q = (request.args.get("q") or "").strip()
     data = orders.list_orders(company_id(), start, end, status if status in orders.STATUSES else "", q)
-    return render_template("online/index.html", data=data, start=start, end=end, status=status, q=q,
+    return render_template("online/index.html", data=data, start=start, end=end, status=status, q=q, **extra,
                            statuses=orders.STATUSES, settable=orders.SETTABLE, drivers=orders.drivers(company_id()))
 
 
@@ -57,8 +56,6 @@ def print_order(order_id):
 @bp.route("/item-summary")
 @outlet_required
 def summary():
-    start, end = _range()
-    if not request.args.get("date_from"):
-        start = end.replace(day=1)
-    return render_template("online/summary.html", rows=orders.item_summary(company_id(), start, end), start=start, end=end,
+    start, end, extra = _range()
+    return render_template("online/summary.html", rows=orders.item_summary(company_id(), start, end), start=start, end=end, **extra,
                            vendor=orders.vendor_for(company_id()))

@@ -221,3 +221,72 @@ def super_admin_password(admin_id):
     except ValidationError as exc:
         flash(exc.message, "error")
     return redirect(url_for("admin.super_admins"))
+
+
+# ------------------------------------------------------------ activity log --
+
+def _activity_filters():
+    from datetime import datetime, time
+
+    from .. import date_ranges
+
+    start, end, active, note = date_ranges.resolve(request.args, "today", max_days=366)
+    filters = {
+        "start": start, "end": end, "start_dt": datetime.combine(start, time.min), "end_dt": datetime.combine(end, time.max),
+        "company_id": request.args.get("company_id", ""), "category": request.args.get("category", ""),
+        "status": request.args.get("status", ""), "q": (request.args.get("q") or "").strip()[:100],
+    }
+    return filters, active, note
+
+
+@bp.route("/activity")
+@super_admin_required
+def activity_log():
+    from .. import activity, date_ranges
+    from ..roles import ROLE_NAMES
+    from ..utils import today
+
+    filters, active, note = _activity_filters()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+    rows, pager = activity.search(filters, page)
+    return render_template(
+        "admin/activity.html", rows=rows, pager=pager, f=filters, stats=activity.summary(filters),
+        restaurants=restaurant_model.list_all(), categories=activity.CATEGORIES, role_names=ROLE_NAMES,
+        start=filters["start"], end=filters["end"], active_range=active, range_labels=date_ranges.LABELS,
+        range_note=note, today_iso=today().isoformat(),
+    )
+
+
+@bp.route("/activity/export")
+@super_admin_required
+def activity_export():
+    from flask import send_file
+
+    from .. import activity
+    from ..roles import ROLE_NAMES
+    from ..services import excel
+    from ..utils import now
+
+    filters, _active, _note = _activity_filters()
+    rows = activity.export_rows(filters)
+    data = {
+        "title": "Activity log",
+        "columns": [("time", "Time", "text"), ("restaurant", "Restaurant", "text"), ("user", "User", "text"), ("email", "Email", "text"),
+                    ("role", "Role", "text"), ("category", "Area", "text"), ("label", "Action", "text"), ("target", "On", "text"),
+                    ("details", "Details", "text"), ("status", "Result", "text"), ("ip", "IP address", "text")],
+        "rows": [{"time": r["created"].strftime("%d-%m-%Y %H:%M:%S"), "restaurant": r["restaurant"] or ("—" if r["company_detail_id"] is None else f"#{r['company_detail_id']}"),
+                  "user": r["user_name"] or "", "email": r["user_email"] or "",
+                  "role": "Super admin" if r["role"] == "super" else ROLE_NAMES.get(r["user_type"], "Staff" if r["role"] else ""),
+                  "category": r["category"], "label": r["label"], "target": r["target"] or "", "details": r["details"] or "",
+                  "status": {"ok": "Done", "failed": "Failed", "denied": "Not allowed"}.get(r["status"], r["status"]), "ip": r["ip"] or ""}
+                 for r in rows],
+        "totals": {},
+        "no_totals": True,
+    }
+    title = f"Activity log ({filters['start']:%d-%m-%Y} to {filters['end']:%d-%m-%Y})"
+    return send_file(excel.report_workbook(data, title), as_attachment=True,
+                     download_name=f"activity_log_{filters['start']:%Y%m%d}_{filters['end']:%Y%m%d}_{now():%H%M}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

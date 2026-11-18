@@ -54,12 +54,14 @@ def change_percent(current, previous) -> float | None:
 
 
 def by_payment_mode(company_id: int, start: date, end: date) -> list[dict]:
+    from . import part_payment  # split (part) payments count towards each of their modes
+
+    lines = part_payment.mode_lines("B.company_detail_id = %s AND B.payment_mode_id <> 0 AND B.billing_date BETWEEN %s AND %s")
     return db.fetch_all(
-        "SELECT COALESCE(PM.payment_mode, 'Other') AS name, COUNT(*) AS bills, SUM(B.total) AS amount "
-        "FROM bill B LEFT JOIN bill_payment_mode PM ON PM.payment_mode_id = B.payment_mode_id "
-        "WHERE B.company_detail_id = %s AND B.payment_mode_id <> 0 AND B.billing_date BETWEEN %s AND %s "
+        "SELECT COALESCE(PM.payment_mode, 'Other') AS name, COUNT(DISTINCT L.bill_id) AS bills, SUM(L.amount) AS amount "
+        f"FROM {lines} L LEFT JOIN bill_payment_mode PM ON PM.payment_mode_id = L.mode_id "
         "GROUP BY name ORDER BY amount DESC",
-        (company_id, start, end),
+        (company_id, start, end) * 2,
     )
 
 
