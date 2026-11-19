@@ -4,6 +4,7 @@ Note: `bill_detail` has no index on bill_id in the current database, so line
 items are fetched with one range scan (bill_id BETWEEN min AND max) and
 grouped in Python rather than joined row by row.
 """
+from __future__ import annotations
 import logging
 import re
 from collections import defaultdict

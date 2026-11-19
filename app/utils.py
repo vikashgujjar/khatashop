@@ -1,16 +1,35 @@
 """Small shared helpers: dates, money, pagination, form parsing."""
+from __future__ import annotations
 import math
-from datetime import date, datetime
+import functools
+from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
-from zoneinfo import ZoneInfo
 
-from flask import current_app
+from .core import current_app
 
 TWO_PLACES = Decimal("0.01")
 
+# Used only when the computer has no time-zone database (e.g. Windows without the tzdata package).
+# Linux servers always have one in /usr/share/zoneinfo. These zones have no daylight saving.
+FIXED_ZONES = {"Asia/Kolkata": 330, "Asia/Calcutta": 330, "Asia/Kathmandu": 345, "Asia/Dubai": 240,
+               "Asia/Karachi": 300, "Asia/Dhaka": 360, "Asia/Singapore": 480, "UTC": 0, "Etc/UTC": 0}
+
+
+@functools.lru_cache(maxsize=8)
+def get_zone(name: str):
+    """The time zone with this name; raises ValueError for an unknown name."""
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except Exception:  # noqa: BLE001 - no tz database, or an unknown name
+        if name in FIXED_ZONES:
+            minutes = FIXED_ZONES[name]
+            return timezone(timedelta(minutes=minutes), name)
+        raise ValueError(f"No time zone found with key {name}")
+
 
 def now() -> datetime:
-    return datetime.now(ZoneInfo(current_app.config["KS"]["app"]["timezone"])).replace(tzinfo=None)
+    return datetime.now(get_zone(current_app.config["KS"]["app"]["timezone"])).replace(tzinfo=None)
 
 
 def today() -> date:

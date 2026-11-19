@@ -1,5 +1,6 @@
 """Inline SVG icons (feather-style strokes) available in every template as icon(name, size)."""
-from markupsafe import Markup, escape
+from __future__ import annotations
+from .core.markup import Markup, escape
 
 ICONS = {
     'utensils': '<path d="M3 2v7a3 3 0 0 0 3 3v10M9 2v7M6 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6a2 2 0 0 0 2 2h3zm0 0v7"/>',

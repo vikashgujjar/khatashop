@@ -6,6 +6,7 @@ admin), which are removed again at the end, so real data is not touched.
 
 Run:  .venv\\Scripts\\python tests\\admin_smoke_test.py
 """
+from __future__ import annotations
 import io
 import re
 import sys
@@ -14,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from openpyxl import Workbook, load_workbook  # noqa: E402
+from app.core.xlsx import Workbook, load_workbook  # noqa: E402
 
 from app import create_app, db  # noqa: E402
 from app.models import super_admin  # noqa: E402

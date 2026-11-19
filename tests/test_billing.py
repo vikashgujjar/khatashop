@@ -1,4 +1,5 @@
 """Unit tests for bill maths. Run: .venv\\Scripts\\python -m unittest discover tests"""
+from __future__ import annotations
 import sys
 import unittest
 from datetime import date

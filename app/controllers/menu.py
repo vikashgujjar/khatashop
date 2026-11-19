@@ -1,4 +1,5 @@
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
+from __future__ import annotations
+from ..core import Blueprint, flash, redirect, render_template, request, send_file, url_for
 
 from ..errors import ValidationError
 from ..models import menu_category, menu_item

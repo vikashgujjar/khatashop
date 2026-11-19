@@ -1,4 +1,5 @@
 """Restaurants / outlets (table `company_detail`), managed by super admins."""
+from __future__ import annotations
 import re
 from datetime import time
 

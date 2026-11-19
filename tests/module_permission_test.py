@@ -1,6 +1,7 @@
 """Per-restaurant module permissions set by super admins. Uses a throwaway restaurant.
 Run:  .venv\\Scripts\\python tests\\module_permission_test.py
 """
+from __future__ import annotations
 import re
 import sys
 import uuid
@@ -77,7 +78,7 @@ def main():
             s[CSRF_SESSION_KEY] = "t"
         from app.roles import home_endpoint
         with app.test_request_context():
-            from flask import g
+            from app.core import g
             g.user = {"user_type": 4, "role": "staff", "company_id": cid}
             check("waiter lands on dashboard when table service is off", home_endpoint(g.user) == "dashboard.index")
 

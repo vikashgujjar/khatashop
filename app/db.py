@@ -3,14 +3,15 @@
 One connection per request (opened lazily, closed on teardown). Statements
 run in autocommit mode unless wrapped in `transaction()`.
 """
+from __future__ import annotations
 import logging
 import re
 import threading
 from contextlib import contextmanager
 
-import pymysql
-from flask import current_app, g, has_app_context
-from pymysql.cursors import DictCursor
+import mysql.connector
+from .core import current_app, g, has_app_context
+from mysql.connector import errorcode
 
 from .errors import DatabaseError
 
@@ -20,31 +21,102 @@ _column_cache: dict[tuple[str, str], bool] = {}
 _column_lock = threading.Lock()
 
 
+class Cursor:
+    """Wraps a mysql.connector cursor so the rest of the app gets what it expects:
+    rows as dicts, execute() returning the number of affected rows, and text that is
+    always str (mysql.connector can hand back bytearray, e.g. for GROUP_CONCAT)."""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def execute(self, sql, params=None):
+        self._raw.execute(sql, params)
+        return self._raw.rowcount
+
+    def executemany(self, sql, seq):
+        self._raw.executemany(sql, list(seq))
+        return self._raw.rowcount
+
+    @staticmethod
+    def _clean(row):
+        if row is None:
+            return None
+        return {k: (bytes(v).decode("utf-8", "replace") if isinstance(v, (bytes, bytearray)) else v) for k, v in row.items()}
+
+    def fetchone(self):
+        return self._clean(self._raw.fetchone())
+
+    def fetchall(self):
+        return [self._clean(r) for r in self._raw.fetchall()]
+
+    @property
+    def rowcount(self):
+        return self._raw.rowcount
+
+    @property
+    def lastrowid(self):
+        return self._raw.lastrowid
+
+    def close(self):
+        try:
+            self._raw.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
+
+def _cursor(conn) -> Cursor:
+    # buffered: every result is read at once, so the next statement never meets "unread result"
+    return Cursor(conn.cursor(dictionary=True, buffered=True))
+
+
 def connect(db_cfg: dict):
     try:
-        return pymysql.connect(
+        conn = mysql.connector.connect(
             host=db_cfg["host"],
             port=db_cfg["port"],
             user=db_cfg["user"],
             password=db_cfg["password"],
             database=db_cfg["name"],
             charset=db_cfg["charset"],
-            cursorclass=DictCursor,
+            # MariaDB does not know MySQL 8's default utf8mb4_0900_ai_ci; set a collation both understand.
+            collation=db_cfg.get("collation") or "utf8mb4_general_ci",
             autocommit=True,
-            connect_timeout=db_cfg["connect_timeout"],
-            read_timeout=db_cfg["read_timeout"],
-            write_timeout=db_cfg["write_timeout"],
+            connection_timeout=db_cfg["connect_timeout"],
+            use_unicode=True,
+            get_warnings=False,
+            use_pure=True,       # the bundled pure-Python driver (vendor/mysql); no C extension needed
         )
-    except pymysql.err.OperationalError as exc:
-        code = exc.args[0] if exc.args else None
+    except mysql.connector.Error as exc:
+        code = getattr(exc, "errno", None)
         log.error("Database connection failed (%s): %s", code, exc)
-        if code == 1045:
+        if code == errorcode.ER_ACCESS_DENIED_ERROR:
             raise DatabaseError("The database rejected the username or password in db_config.json.") from exc
-        if code == 1049:
+        if code == errorcode.ER_BAD_DB_ERROR:
             raise DatabaseError(f"The database '{db_cfg['name']}' does not exist.") from exc
+        if code == errorcode.ER_DBACCESS_DENIED_ERROR:
+            raise DatabaseError(f"The database user in db_config.json has no access to '{db_cfg['name']}' "
+                                "(or that database does not exist). Check database.name and the user's permissions.") from exc
         raise DatabaseError(
             "Cannot connect to the database. Check that MySQL is running and the settings in db_config.json are correct."
         ) from exc
+    # Statements that run longer than read_timeout seconds are stopped by the server (MariaDB / MySQL 5.7+).
+    timeout = int(db_cfg.get("read_timeout") or 0)
+    if timeout > 0:
+        for statement in (f"SET SESSION max_statement_time = {timeout}", f"SET SESSION max_execution_time = {timeout * 1000}"):
+            try:
+                with _cursor(conn) as cur:
+                    cur.execute(statement)
+                break
+            except mysql.connector.Error:
+                continue  # the other server type
+    return conn
 
 
 def get_conn():
@@ -67,13 +139,13 @@ def close_conn(_exc=None):
 
 
 def fetch_all(sql: str, params=None) -> list[dict]:
-    with get_conn().cursor() as cur:
+    with _cursor(get_conn()) as cur:
         cur.execute(sql, params)
         return list(cur.fetchall())
 
 
 def fetch_one(sql: str, params=None) -> dict | None:
-    with get_conn().cursor() as cur:
+    with _cursor(get_conn()) as cur:
         cur.execute(sql, params)
         return cur.fetchone()
 
@@ -88,7 +160,7 @@ def fetch_value(sql: str, params=None, default=None):
 
 def execute(sql: str, params=None) -> tuple[int, int]:
     """Runs a write statement. Returns (rows affected, last insert id)."""
-    with get_conn().cursor() as cur:
+    with _cursor(get_conn()) as cur:
         affected = cur.execute(sql, params)
         return affected, cur.lastrowid
 
@@ -97,9 +169,9 @@ def execute(sql: str, params=None) -> tuple[int, int]:
 def transaction():
     """Groups statements into one transaction; rolls back on any exception."""
     conn = get_conn()
-    conn.begin()
+    conn.start_transaction()
     try:
-        with conn.cursor() as cur:
+        with _cursor(conn) as cur:
             yield cur
         conn.commit()
     except Exception:

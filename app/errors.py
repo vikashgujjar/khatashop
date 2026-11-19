@@ -5,12 +5,13 @@ missing records, permission issues). Anything else is caught by the
 catch-all handler, logged with a short error id, and shown to the user as a
 friendly page (or JSON for API calls) without leaking internals.
 """
+from __future__ import annotations
 import logging
 import uuid
 
-import pymysql
-from flask import flash, jsonify, redirect, render_template, request, url_for
-from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
+import mysql.connector
+from .core import flash, jsonify, redirect, render_template, request, url_for
+from .core.http import HTTPException, RequestEntityTooLarge
 
 log = logging.getLogger("khatashop.errors")
 
@@ -116,8 +117,8 @@ def register_error_handlers(app):
         }
         return _respond(exc.code or 500, exc.name, messages.get(exc.code, exc.description or exc.name))
 
-    @app.errorhandler(pymysql.err.OperationalError)
-    @app.errorhandler(pymysql.err.InterfaceError)
+    @app.errorhandler(mysql.connector.errors.OperationalError)
+    @app.errorhandler(mysql.connector.errors.InterfaceError)
     def handle_db_down(exc):
         error_id = uuid.uuid4().hex[:8]
         log.error("[%s] Database connection problem on %s %s: %s", error_id, request.method, request.path, exc)
@@ -128,7 +129,7 @@ def register_error_handlers(app):
             error_id=error_id,
         )
 
-    @app.errorhandler(pymysql.MySQLError)
+    @app.errorhandler(mysql.connector.Error)
     def handle_db_error(exc):
         error_id = uuid.uuid4().hex[:8]
         log.exception("[%s] Database error on %s %s", error_id, request.method, request.path)

@@ -1,6 +1,7 @@
 # KhataShop (Python)
 
-A Python/Flask rewrite of the KhataShop billing back office. It replaces the
+A Python rewrite of the KhataShop billing back office, built on the **Python standard library only**
+(no Flask or other frameworks; nothing to `pip install`). It replaces the
 Laravel API and the Angular screens for:
 
 - **Dashboard**: sales, bills, average bill, GST, trend chart, payment modes, top items, recent bills
@@ -129,15 +130,18 @@ khatashop_python/
 ├── db_config.example.json  ← template to copy on a new server
 ├── run.py                  ← start the server (supervisor with auto-restart)
 ├── wsgi.py                 ← entry point for gunicorn or other WSGI servers
-├── requirements.txt
+├── requirements.txt        ← empty: nothing to install
+├── vendor/mysql/           ← bundled MySQL driver (pure Python), so no pip install is needed
 ├── app/
 │   ├── models/             ← MODEL: all SQL; every query is limited to the user's company
 │   │   ├── bill.py  dashboard.py  menu_category.py  menu_item.py  payment.py  company.py  user.py
-│   ├── controllers/        ← CONTROLLER: one Flask blueprint per screen
+│   ├── controllers/        ← CONTROLLER: one blueprint (group of URLs) per screen
 │   │   ├── dashboard.py  menu_category.py  menu.py  menu_pdf.py  bills.py  auth.py  uploads.py
-│   ├── templates/          ← VIEW: Jinja HTML pages
+│   ├── templates/          ← VIEW: HTML pages ({{ }} / {% %} template syntax)
 │   ├── static/css|js|img   ← VIEW: stylesheet and browser scripts (no CDN needed)
 │   ├── services/           ← bill maths, file uploads, Excel export
+│   ├── core/               ← own web layer on the standard library: framework, templates, web server,
+│   │                          Excel (.xlsx), bcrypt passwords, image checks
 │   ├── errors.py           ← exception types and global error handlers
 │   ├── security.py         ← sign-in session, CSRF protection, login lockout
 │   ├── db.py  config.py  utils.py  icons.py
@@ -147,22 +151,24 @@ khatashop_python/
 
 ## Setup
 
-Requires Python 3.11 or newer and access to the KhataShop MySQL/MariaDB database.
+Requires Python 3.9 or newer (tested on 3.9 and 3.12) and access to the KhataShop MySQL/MariaDB database.
+Nothing has to be installed: the app uses only Python's standard library plus the MySQL driver bundled in `vendor/`.
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate             # Linux: source .venv/bin/activate
-pip install -r requirements.txt
-copy db_config.example.json db_config.json   # then edit it (not needed on this PC, it is already filled in)
-python run.py --check                         # checks config + database connection
+copy db_config.example.json db_config.json   # Linux: cp ...; then edit it (already filled in on this PC)
+python3 run.py --check                        # checks config, database, tables and the password method
 ```
+
+On Linux, sign-in uses the system's bcrypt (Python's built-in `crypt` module), which is fast. Where that is
+missing (e.g. Windows), a pure-Python bcrypt is used: it works but takes several seconds per sign-in, and
+`--check` says so.
 
 ## Running
 
 | Command | What it does |
 |---|---|
-| `python run.py` | **Production.** Waitress server under a supervisor that restarts it when code changes, or if it crashes. |
-| `python run.py --dev` | Development server with the interactive debugger and auto-reload. Never use this on a public server. |
+| `python run.py` | **Production.** Threaded web server under a supervisor that restarts it when code changes, or if it crashes. |
+| `python run.py --dev` | Runs the web server directly, without the supervisor (no restart on change). |
 | `python run.py --check` | Validates `db_config.json` and the database connection, then exits. |
 
 Open http://localhost:5000 (the port is set by `app.port`).
@@ -178,7 +184,7 @@ When you run `python run.py`, the supervisor checks `app/` (`server.watch_dirs`)
 4. If the server process crashes, it is started again. If it crashes repeatedly, the supervisor pauses briefly between attempts.
 
 To keep it running after a reboot, start `python run.py` as a service: Windows Task Scheduler "At startup",
-NSSM, or a systemd unit on Linux (`ExecStart=/path/.venv/bin/python run.py`, `Restart=always`).
+NSSM, or a systemd unit on Linux (`ExecStart=/usr/bin/python3 /path/run.py`, `Restart=always`).
 
 ## db_config.json
 
@@ -194,7 +200,7 @@ NSSM, or a systemd unit on Linux (`ExecStart=/path/.venv/bin/python run.py`, `Re
 | `uploads.max_upload_mb` | Largest file that can be uploaded |
 | `server.auto_restart` | Turn the code watcher on or off |
 | `server.watch_dirs` / `watch_extensions` | What the watcher looks at |
-| `server.threads` | Waitress worker threads |
+| `server.threads` | Worker threads of the web server (requests handled at the same time) |
 | `logging.*` | Log level, file and rotation size |
 
 The app checks every value at startup and names the exact setting that is wrong.

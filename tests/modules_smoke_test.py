@@ -5,6 +5,7 @@ Writes only inside a throwaway restaurant (removed at the end). Shared tables us
 customer/driver apps (drivers, discount, delivery charges, menu revisions) are only read.
 Run:  .venv\\Scripts\\python tests\\modules_smoke_test.py
 """
+from __future__ import annotations
 import json
 import re
 import sys

@@ -1,4 +1,5 @@
 """Controller layer: one blueprint per screen."""
+from __future__ import annotations
 
 
 def register_blueprints(app):

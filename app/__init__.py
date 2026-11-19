@@ -1,11 +1,18 @@
 """KhataShop (Python) - application factory."""
+from __future__ import annotations
 import logging
 import sys
 from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from flask import Flask, g, request, url_for
+# Libraries shipped with the project (vendor/) are used before anything installed, so the
+# server needs no `pip install` and every machine runs the same code.
+_VENDOR = Path(__file__).resolve().parent.parent / "vendor"
+if _VENDOR.is_dir() and str(_VENDOR) not in sys.path:
+    sys.path.insert(0, str(_VENDOR))
+
+from .core import App, g, request, url_for
 
 from . import db, roles
 from .config import load_config
@@ -41,11 +48,11 @@ def _setup_logging(cfg: dict) -> None:
         root.addHandler(handler)
 
 
-def create_app(config_path=None) -> Flask:
+def create_app(config_path=None) -> App:
     cfg = load_config(config_path)
     _setup_logging(cfg)
 
-    app = Flask(__name__)
+    app = App(__name__)
     app.config.update(
         KS=cfg,
         SECRET_KEY=cfg["app"]["secret_key"],

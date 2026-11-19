@@ -5,6 +5,7 @@ Excel exporter handle all of them:
 
 kind is "text", "int" or "money".
 """
+from __future__ import annotations
 from datetime import date
 
 from .. import db

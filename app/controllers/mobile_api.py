@@ -10,12 +10,14 @@ endpoints are moved to Python one by one.
 Logged-in customer/driver endpoints stay forwarded for now: Laravel's logout blacklists
 tokens in its own cache, so checking those tokens here could accept logged-out phones.
 """
+from __future__ import annotations
+import http.client
 import logging
 import math
 from pathlib import Path
+from urllib.parse import urlsplit
 
-import requests
-from flask import Blueprint, Response, current_app, jsonify, request
+from ..core import Blueprint, Response, current_app, jsonify, request
 
 from .. import db
 from ..services import uploads
@@ -88,21 +90,31 @@ def _forward(path: str):
     cfg = current_app.config["KS"]["legacy_api"]
     if not cfg.get("enabled", True):
         return jsonify({"success": False, "status_code": 503, "message": "This endpoint has not been moved to the new server yet."}), 503
-    url = cfg["base_url"].rstrip("/") + "/" + path.lstrip("/")
+    base = urlsplit(cfg["base_url"].rstrip("/"))
+    target = (base.path or "") + "/" + path.lstrip("/")
+    query = request.query_string.decode("latin-1")
+    if query:
+        target += "?" + query
     headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP_HEADERS}
     headers["X-Forwarded-For"] = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     headers["X-Forwarded-Host"] = request.host
+    body = request.get_data()
+    conn_class = http.client.HTTPSConnection if base.scheme == "https" else http.client.HTTPConnection
+    conn = conn_class(base.hostname, base.port, timeout=cfg.get("timeout_seconds", 30))
     try:
-        upstream = requests.request(
-            request.method, url, params=request.args, data=request.get_data(), headers=headers,
-            timeout=cfg.get("timeout_seconds", 30), allow_redirects=False, stream=False,
-        )
-    except requests.RequestException as exc:
+        conn.request(request.method, target, body=body if body or request.method not in ("GET", "HEAD") else None,
+                     headers=headers)
+        upstream = conn.getresponse()
+        content = upstream.read()
+        status = upstream.status
+        out_headers = [(k, v) for k, v in upstream.getheaders() if k.lower() not in HOP_HEADERS]
+    except (OSError, http.client.HTTPException) as exc:
         log.error("Legacy API %s %s failed: %s", request.method, path, exc)
         return jsonify({"success": False, "status_code": 502, "message": "The service is temporarily unavailable. Please try again."}), 502
-    log.debug("Forwarded %s /%s -> %s", request.method, path, upstream.status_code)
-    out_headers = [(k, v) for k, v in upstream.headers.items() if k.lower() not in HOP_HEADERS]
-    return Response(upstream.content, status=upstream.status_code, headers=out_headers)
+    finally:
+        conn.close()
+    log.debug("Forwarded %s /%s -> %s", request.method, path, status)
+    return Response(content, status=status, headers=out_headers)
 
 
 METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]

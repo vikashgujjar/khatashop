@@ -11,10 +11,11 @@ bill numbers and totals from JSON replies, and a short safe summary of the submi
 fields. Passwords, CSRF tokens and other secrets are never stored.
 Recording never breaks a request: any problem is logged and skipped.
 """
+from __future__ import annotations
 import logging
 import threading
 
-from flask import g, request, session
+from .core import g, request, session
 
 from . import db
 from .errors import DatabaseError

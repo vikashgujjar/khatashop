@@ -3,6 +3,7 @@
 Each Resource declares its table, fields and scope once; controllers/crud.py
 serves every resource with the same validated pages.
 """
+from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -65,13 +66,13 @@ class Resource:
 
     # ---------------------------------------------------------------- SQL --
     def _from(self, for_unique: bool = False) -> str:
-        from flask import g
+        from .core import g
         if (for_unique and self.unique_global) or (self.super_sees_all and (g.get("user") or {}).get("role") == "super"):
             return f"{self.table} X"
         return f"{self.table} X {self.scope_join}"
 
     def _scope(self, company_id, for_unique: bool = False) -> tuple[str, list]:
-        from flask import g
+        from .core import g
         if for_unique and self.unique_global:
             return "1 = 1", []
         if self.super_sees_all and (g.get("user") or {}).get("role") == "super":
@@ -324,7 +325,7 @@ RESOURCES = {
 
 def _kpusers_scope(company_id):
     """kpusers.organization holds the website slug (e.g. 'ogi-kailash-parbat'); config maps slugs to restaurants."""
-    from flask import current_app
+    from .core import current_app
     slugs = current_app.config["KS"].get("customers", {}).get("kpusers_organization_by_company", {}).get(str(company_id), [])
     if not slugs:
         return "1 = 0", []

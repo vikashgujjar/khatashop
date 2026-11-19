@@ -3,9 +3,10 @@ export, waiter access, and GST totals equal to the CGST / SGST printed on the bi
 Uses restaurant 8's real data read-only (nothing is written).
 Run:  .venv\Scripts\python tests\gst_period_reports_test.py
 """
+from __future__ import annotations
 import io, sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-from openpyxl import load_workbook
+from app.core.xlsx import load_workbook
 from app import create_app
 from app.security import CSRF_SESSION_KEY
 app = create_app()

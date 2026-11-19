@@ -1,6 +1,7 @@
+from __future__ import annotations
 import logging
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from ..core import Blueprint, flash, g, redirect, render_template, request, url_for
 
 from ..models import super_admin
 from ..models import user as user_model
@@ -41,7 +42,7 @@ def login():
                 login_throttle.succeeded(key)
                 login_user(admin or staff, role="super" if admin else "staff")
                 log.info("%s %s (%s) signed in", "Super admin" if admin else "User", (admin or staff)["id"], email)
-                from flask import session as _session
+                from ..core import session as _session
                 from ..roles import home_endpoint
                 home = url_for(home_endpoint(_session["user"]))
                 return redirect(safe_next(request.args.get("next"), home))

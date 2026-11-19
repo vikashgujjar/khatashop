@@ -4,9 +4,10 @@ The PHP `drivers` table has no restaurant column (it is shared with the driver a
 so the link lives in our own table `ks_driver_company`. On first use it is filled from
 delivery history: a driver who delivered orders for a restaurant belongs to it.
 """
+from __future__ import annotations
 import threading
 
-from flask import current_app
+from ..core import current_app
 
 from .. import db
 

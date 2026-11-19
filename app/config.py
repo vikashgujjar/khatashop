@@ -4,6 +4,7 @@ Every setting has a default here, so db_config.json only needs the values you
 want to change. Problems are reported as ConfigError with a message that says
 exactly which setting is wrong.
 """
+from __future__ import annotations
 import copy
 import json
 import os
@@ -127,9 +128,9 @@ def _validate(cfg: dict) -> None:
     if not isinstance(secret, str) or len(secret) < 16 or secret.startswith("CHANGE_ME"):
         raise ConfigError("'app.secret_key' must be a random string of at least 16 characters")
     try:
-        from zoneinfo import ZoneInfo
+        from .utils import get_zone
 
-        ZoneInfo(cfg["app"]["timezone"])
+        get_zone(cfg["app"]["timezone"])
     except Exception as exc:  # noqa: BLE001 - any failure means a bad zone name
         raise ConfigError(f"'app.timezone' is not a valid time zone: {cfg['app']['timezone']!r} ({exc})")
 

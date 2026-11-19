@@ -1,7 +1,8 @@
 """One controller for all simple master pages declared in app/crud.py."""
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from __future__ import annotations
+from ..core import Blueprint, flash, redirect, render_template, request, url_for
 
-from flask import g
+from ..core import g
 
 from ..crud import get_resource as _get_resource
 from ..errors import ForbiddenError, ValidationError

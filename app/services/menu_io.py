@@ -4,15 +4,13 @@ Reading is lenient about header spelling ("Item Name", "item name *", "ITEM_NAME
 all work). Writing produces files in exactly the format the importer reads, so
 Export -> edit in Excel -> Import is a safe round trip.
 """
+from __future__ import annotations
 import csv
 import io
 import re
 from pathlib import Path
 
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.datavalidation import DataValidation
+from ..core.xlsx import Alignment, DataValidation, Font, PatternFill, Workbook, get_column_letter, load_workbook
 
 from ..errors import UploadError
 
@@ -63,7 +61,7 @@ def _raw_rows(file_storage) -> list[list]:
     if ext == ".xlsx":
         try:
             wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-        except Exception as exc:  # noqa: BLE001 - openpyxl raises many different types for bad files
+        except Exception as exc:  # noqa: BLE001 - a damaged file can fail in many ways
             raise UploadError("The file could not be read as an Excel workbook. Save it as .xlsx and try again.") from exc
         ws = wb.worksheets[0]
         rows = [list(r) for r in ws.iter_rows(values_only=True)]

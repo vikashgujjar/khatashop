@@ -4,10 +4,11 @@ Stored in our own table `ks_company_modules` (one row per restaurant, JSON list 
 enabled module keys). A restaurant without a row has every module enabled, so
 existing restaurants keep working unchanged.
 """
+from __future__ import annotations
 import json
 import threading
 
-from flask import g, has_request_context
+from ..core import g, has_request_context
 
 from .. import db
 from ..utils import now

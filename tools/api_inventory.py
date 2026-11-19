@@ -2,6 +2,7 @@
 
 Usage:  python tools/api_inventory.py ../backend/project
 """
+from __future__ import annotations
 import sys
 from collections import OrderedDict
 from pathlib import Path

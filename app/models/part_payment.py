@@ -11,6 +11,7 @@ Rules
   * When settled, `bill.payment_mode_id` is set to the mode that took the largest share,
     so the old app and old reports still see a paid bill. Our reports split it by mode.
 """
+from __future__ import annotations
 import logging
 import threading
 from decimal import Decimal

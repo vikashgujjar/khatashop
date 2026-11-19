@@ -1,5 +1,6 @@
 """Table service: Table View, the table order screen (KOT / bill / settle) and table management."""
-from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
+from __future__ import annotations
+from ..core import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 
 from ..errors import ForbiddenError, ValidationError
 from ..models import bill as bill_model

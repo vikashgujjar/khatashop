@@ -1,5 +1,6 @@
 """Procurement / Issuing / Consumption notes and Consumption Formula (recipes)."""
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from __future__ import annotations
+from ..core import Blueprint, flash, redirect, render_template, request, url_for
 
 from ..errors import ValidationError
 from ..models import company as company_model

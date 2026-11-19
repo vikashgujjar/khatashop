@@ -1,4 +1,5 @@
 """Menu items (table `menu`). Items belong to a company through their category."""
+from __future__ import annotations
 from decimal import Decimal
 
 from .. import db

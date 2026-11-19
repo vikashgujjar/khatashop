@@ -5,6 +5,7 @@ A page reads `?range=<key>` for a quick range, or `date_from` / `date_to` for cu
 When custom dates happen to equal a quick range, that range is shown as selected, so
 other filters on the page (source, period...) keep the quick range highlighted.
 """
+from __future__ import annotations
 from datetime import date, timedelta
 
 from .utils import parse_date, today

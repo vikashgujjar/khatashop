@@ -3,11 +3,12 @@
 Kept in their own table (`ks_super_admin`) so the PHP app's tables are not
 touched. The table is created automatically the first time it is needed.
 """
+from __future__ import annotations
 import logging
 import re
 import threading
 
-import bcrypt
+from ..core import passwords
 
 from .. import db
 from ..errors import NotFoundError, ValidationError
@@ -46,7 +47,7 @@ def ensure_table() -> None:
 
 def hash_password(password: str) -> str:
     # $2y$ prefix keeps hashes interchangeable with Laravel/PHP.
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(10)).decode().replace("$2b$", "$2y$", 1)
+    return passwords.hash_password(password, rounds=10)
 
 
 def check_password_rules(password: str, field: str = "password") -> None:
@@ -60,7 +61,7 @@ def authenticate(email: str, password: str) -> dict | None:
     if not row or not row["active"]:
         return None
     try:
-        ok = bcrypt.checkpw(password.encode("utf-8"), row["password"].encode("utf-8"))
+        ok = passwords.checkpw(password, row["password"])
     except ValueError:
         log.warning("Super admin %s has an invalid password hash", row["id"])
         return None

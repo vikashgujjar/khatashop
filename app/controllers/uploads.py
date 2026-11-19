@@ -1,6 +1,7 @@
+from __future__ import annotations
 import re
 
-from flask import Blueprint, abort, g, send_from_directory
+from ..core import Blueprint, abort, g, send_from_directory
 
 from .. import db
 

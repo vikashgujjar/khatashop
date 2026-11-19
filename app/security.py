@@ -1,11 +1,12 @@
 """Sign-in session, CSRF protection and login throttling."""
+from __future__ import annotations
 import functools
 import hmac
 import secrets
 import threading
 import time
 
-from flask import g, request, session
+from .core import g, request, session
 
 from .errors import AuthError, ForbiddenError
 

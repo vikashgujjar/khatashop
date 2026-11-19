@@ -1,4 +1,4 @@
-"""Bill total calculation, independent of Flask and the database.
+"""Bill total calculation, independent of the web layer and the database.
 
 Matches the Angular billing screen:
   * GST is charged on top of the menu price, per line: round2(line total x GST%)
@@ -8,6 +8,7 @@ Matches the Angular billing screen:
   * Grand total = subtotal + CGST + SGST + service + container, rounded to whole rupees
     (half up); the difference is the round-off shown on the bill
 """
+from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 

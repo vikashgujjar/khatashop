@@ -1,4 +1,5 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from __future__ import annotations
+from ..core import Blueprint, flash, redirect, render_template, request, url_for
 
 from ..errors import UploadError
 from ..security import outlet_required

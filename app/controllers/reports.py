@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request, send_file
+from __future__ import annotations
+from ..core import Blueprint, render_template, request, send_file
 
 from ..models import company as company_model
 from .. import date_ranges

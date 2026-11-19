@@ -1,7 +1,8 @@
 """Online orders from the customer app: Order Detail cards, status / driver updates, print, Item Summary."""
+from __future__ import annotations
 from datetime import timedelta
 
-from flask import Blueprint, jsonify, render_template, request
+from ..core import Blueprint, jsonify, render_template, request
 
 from ..errors import ValidationError
 from ..models import company as company_model

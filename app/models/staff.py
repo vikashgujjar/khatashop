@@ -1,4 +1,5 @@
 """Restaurant staff logins (table `aspirant_registration`, shared with the PHP app)."""
+from __future__ import annotations
 import re
 
 from .. import db

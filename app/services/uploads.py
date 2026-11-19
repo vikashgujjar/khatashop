@@ -5,14 +5,15 @@ Uses the same layout as the PHP app so both can share one uploads folder:
   item_img/<item id>.jpg
   category_img/menupdf.pdf
 """
+from __future__ import annotations
 import logging
 import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 
-from flask import current_app, url_for
-from PIL import Image, UnidentifiedImageError
+from ..core import current_app, url_for
+from ..core.images import identify
 
 from ..errors import UploadError
 
@@ -22,7 +23,7 @@ CATEGORY_FOLDER = "category_img"
 ITEM_FOLDER = "item_img"
 MENU_PDF = ("category_img", "menupdf.pdf")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
-MAX_IMAGE_SIDE = 1200
+MAX_IMAGE_SIDE = 10000          # pixels; anything bigger is almost certainly a mistake
 
 
 def base_dir() -> Path:
@@ -60,19 +61,24 @@ def save_image(file_storage, folder: str, record_id: int) -> bool:
     ext = Path(file_storage.filename).suffix.lower()
     if ext not in IMAGE_EXTENSIONS:
         raise UploadError("Photos must be JPG, PNG, WEBP, GIF or BMP images.", errors={"image": "Unsupported file type."})
-    try:
-        image = Image.open(file_storage.stream)
-        image.load()
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
-        raise UploadError("That file is not a readable image.", errors={"image": "Not a valid image."}) from exc
-    if image.mode not in ("RGB", "L"):
-        background = Image.new("RGB", image.size, (255, 255, 255))
-        rgba = image.convert("RGBA")
-        background.paste(rgba, mask=rgba.split()[-1])
-        image = background
-    image.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
-    _write_atomically(_target(folder, f"{record_id}.jpg"), lambda p: image.convert("RGB").save(p, "JPEG", quality=85, optimize=True))
+    data = _read_image(file_storage, "image", "That file is not a readable image.")
+    # Stored under the PHP app's name (<id>.jpg) as uploaded; browsers and apps read the real format from the file.
+    _write_atomically(_target(folder, f"{record_id}.jpg"), lambda p: p.write_bytes(data))
     return True
+
+
+def _read_image(file_storage, field: str, message: str) -> bytes:
+    """The uploaded bytes, after checking they really are an image of a sensible size."""
+    file_storage.stream.seek(0)
+    data = file_storage.stream.read()
+    info = identify(data)
+    if info is None:
+        raise UploadError(message, errors={field: "Not a valid image."})
+    _fmt, width, height = info
+    if not width or not height or width > MAX_IMAGE_SIDE or height > MAX_IMAGE_SIDE:
+        raise UploadError(f"The image is {width} x {height} pixels; use one up to {MAX_IMAGE_SIDE} pixels wide and high.",
+                          errors={field: "Image too large."})
+    return data
 
 
 def delete_image(folder: str, record_id: int) -> None:
@@ -101,14 +107,8 @@ def save_logo(file_storage, company_id: int) -> bool:
         return False
     if Path(file_storage.filename).suffix.lower() not in IMAGE_EXTENSIONS:
         raise UploadError("Logos must be PNG, JPG, WEBP or GIF images.", errors={"logo": "Unsupported file type."})
-    try:
-        image = Image.open(file_storage.stream)
-        image.load()
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
-        raise UploadError("That logo file is not a readable image.", errors={"logo": "Not a valid image."}) from exc
-    image = image.convert("RGBA")
-    image.thumbnail((800, 400))
-    _write_atomically(_target(LOGO_FOLDER, f"{company_id}.png"), lambda p: image.save(p, "PNG", optimize=True))
+    data = _read_image(file_storage, "logo", "That logo file is not a readable image.")
+    _write_atomically(_target(LOGO_FOLDER, f"{company_id}.png"), lambda p: p.write_bytes(data))
     return True
 
 

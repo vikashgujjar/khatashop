@@ -3,6 +3,7 @@
 Runs inside a throwaway restaurant that is removed again at the end.
 Run:  .venv\\Scripts\\python tests\\table_smoke_test.py
 """
+from __future__ import annotations
 import io
 import re
 import sys
@@ -11,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from openpyxl import Workbook  # noqa: E402
+from app.core.xlsx import Workbook  # noqa: E402
 
 from app import create_app, db  # noqa: E402
 from app.models import super_admin  # noqa: E402

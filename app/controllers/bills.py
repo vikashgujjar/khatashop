@@ -1,4 +1,5 @@
-from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, send_file, url_for
+from __future__ import annotations
+from ..core import Blueprint, flash, g, jsonify, redirect, render_template, request, send_file, url_for
 
 from ..errors import ForbiddenError, ValidationError
 from ..models import bill as bill_model

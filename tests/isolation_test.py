@@ -4,6 +4,7 @@ Creates two throwaway restaurants, gives B one of everything, then tries every p
 action as A's admin. Also checks real data: drivers are separated per restaurant.
 Run:  .venv\\Scripts\\python tests\\isolation_test.py
 """
+from __future__ import annotations
 import io
 import json
 import sys
@@ -12,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PIL import Image  # noqa: E402
+from app.core.images import identify  # noqa: E402,F401
 
 from app import create_app, db  # noqa: E402
 from app.models import menu_item, payment, restaurant, tables  # noqa: E402
@@ -20,6 +21,18 @@ from app.security import CSRF_SESSION_KEY  # noqa: E402
 
 failures = []
 H = {"X-CSRF-Token": "tok"}
+
+
+def tiny_png(width=8, height=8):
+    """A small red PNG made with the standard library."""
+    import struct
+    import zlib
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    raw = b"".join(b"\x00" + b"\xff\x00\x00" * width for _ in range(height))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
 
 
 def check(label, condition, detail=""):
@@ -54,7 +67,7 @@ def main():
             A, B = new_restaurant("A" + tag), new_restaurant("B" + tag)
         b = client(app, B)
         # ---- give restaurant B one of everything
-        png = io.BytesIO(); Image.new("RGB", (8, 8), "red").save(png, "PNG"); png.seek(0)
+        png = io.BytesIO(tiny_png()); png.seek(0)
         b.post("/menu-categories/new", data={"_csrf": "tok", "name": "B-Cat", "sort_order": "1", "active": "1", "image": (png, "c.png")},
                content_type="multipart/form-data")
         with app.app_context():

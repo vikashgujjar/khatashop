@@ -7,10 +7,11 @@ Status changes are written exactly like the PHP app does (Crud_model::update_ord
   * isReady = 1 when the status becomes "prepared"
 The PHP code sends no notifications on these changes, so neither do we.
 """
+from __future__ import annotations
 import json
 from datetime import date, datetime, time
 
-from flask import current_app
+from ..core import current_app
 
 from .. import db
 from ..errors import NotFoundError, ValidationError

@@ -18,6 +18,7 @@ Two small tables of our own add what the PHP schema lacks:
   ks_table_area   dining area of each table (AC, Garden, ...)
   ks_kot_note     a kitchen note on a KOT line ("less spicy")
 """
+from __future__ import annotations
 import logging
 import re
 import threading

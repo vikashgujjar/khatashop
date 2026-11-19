@@ -1,9 +1,9 @@
 """Start KhataShop.
 
-  python run.py          Production server (Waitress) under a supervisor that
-                         restarts it automatically when code or db_config.json
-                         changes, and if it ever crashes.
-  python run.py --dev    Flask development server with debugger + auto reload.
+  python run.py          Production server (standard-library threaded server) under a
+                         supervisor that restarts it automatically when code or
+                         db_config.json changes, and if it ever crashes.
+  python run.py --dev    The same web server without the supervisor (no auto restart).
   python run.py --check  Validate db_config.json and the database connection, then exit.
 
 How the auto-restart works (production mode):
@@ -17,6 +17,7 @@ How the auto-restart works (production mode):
   * If the server process dies unexpectedly it is restarted, with a pause when
     it keeps crashing (server.max_crash_restarts_per_minute).
 """
+from __future__ import annotations
 import argparse
 import logging
 import os
@@ -202,9 +203,8 @@ class Supervisor:
 
 def serve_child() -> None:
     """Runs inside the supervised process: the real web server."""
-    from waitress import serve
-
     from app import create_app
+    from app.core.server import serve
 
     try:
         app = create_app()
@@ -213,7 +213,7 @@ def serve_child() -> None:
         sys.exit(EXIT_CONFIG_ERROR)
     cfg = app.config["KS"]
     try:
-        serve(app, host=cfg["app"]["host"], port=cfg["app"]["port"], threads=cfg["server"]["threads"], ident="KhataShop")
+        serve(app, host=cfg["app"]["host"], port=cfg["app"]["port"], threads=cfg["server"]["threads"])
     except OSError as exc:
         logging.getLogger("khatashop").critical("Could not start the web server on port %s: %s", cfg["app"]["port"], exc)
         sys.exit(1)
@@ -230,8 +230,9 @@ def run_dev() -> None:
         print(f"\nConfiguration problem:\n  {exc}\n", file=sys.stderr)
         sys.exit(EXIT_CONFIG_ERROR)
     cfg = app.config["KS"]
-    extra = [str(config_path())]
-    app.run(host=cfg["app"]["host"], port=cfg["app"]["port"], debug=True, use_reloader=True, extra_files=extra)
+    from app.core.server import serve
+    # No auto-reload in this mode; use `python run.py` (the supervisor) for restart-on-change.
+    serve(app, host=cfg["app"]["host"], port=cfg["app"]["port"], threads=cfg["server"]["threads"])
 
 
 def run_check() -> None:
@@ -256,6 +257,11 @@ def run_check() -> None:
         print("App tables OK: all 8 ks_ tables present")
     upl = Path(cfg["uploads"]["base_dir"])
     print(f"Uploads folder: {upl} ({'found' if upl.is_dir() else 'will be created on first upload'})")
+    from app.core import passwords
+    if passwords.BACKEND == "pure-python":
+        print("Password check: pure Python (works, but each sign-in takes several seconds; this system's crypt has no bcrypt)")
+    else:
+        print(f"Password check: fast ({'system crypt' if passwords.BACKEND == 'crypt' else 'bcrypt package'})")
 
 
 def run_create_super_admin(email: str, name: str, password: str | None) -> None:

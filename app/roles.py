@@ -5,7 +5,8 @@ Roles are the PHP app's user_type codes:
   5 Kitchen, 6 Executive, 7 Manager, 8 Coordinator (outlet admin)
 Super admins can open everything.
 """
-from flask import g, request, url_for
+from __future__ import annotations
+from .core import g, request, url_for
 
 from .errors import ForbiddenError
 

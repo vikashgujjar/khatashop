@@ -3,6 +3,7 @@
 Read-only: uses restaurant 8 (reports) and 2 (online pages).
 Run:  .venv\Scripts\python tests\date_range_test.py
 """
+from __future__ import annotations
 import re, sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 from datetime import timedelta

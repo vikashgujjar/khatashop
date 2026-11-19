@@ -1,4 +1,5 @@
 """Menu categories (table `menu_category`)."""
+from __future__ import annotations
 from .. import db
 from ..errors import NotFoundError, ValidationError
 from ..utils import to_int

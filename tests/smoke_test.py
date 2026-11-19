@@ -6,6 +6,7 @@ bill which is deleted again at the end.
 
 Run:  .venv\\Scripts\\python tests\\smoke_test.py [user_id]
 """
+from __future__ import annotations
 import io
 import sys
 from pathlib import Path

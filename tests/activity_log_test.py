@@ -6,6 +6,7 @@ passwords are never stored; that filters, search and Excel export work; and that
 staff cannot open the log. Everything it creates (including its log rows) is removed at the end.
 Run:  .venv\\Scripts\\python tests\\activity_log_test.py
 """
+from __future__ import annotations
 import io
 import re
 import sys
@@ -14,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from openpyxl import Workbook, load_workbook  # noqa: E402
+from app.core.xlsx import Workbook, load_workbook  # noqa: E402
 
 from app import create_app, db  # noqa: E402
 from app.models import super_admin  # noqa: E402

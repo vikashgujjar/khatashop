@@ -1,7 +1,8 @@
 """Super admin area: restaurants, their payment options and staff logins, and super admin accounts."""
+from __future__ import annotations
 import logging
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from ..core import Blueprint, flash, g, redirect, render_template, request, url_for
 
 from ..errors import ValidationError
 from ..models import modules, payment, staff, super_admin
@@ -263,7 +264,7 @@ def activity_log():
 @bp.route("/activity/export")
 @super_admin_required
 def activity_export():
-    from flask import send_file
+    from ..core import send_file
 
     from .. import activity
     from ..roles import ROLE_NAMES

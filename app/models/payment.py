@@ -3,6 +3,7 @@
 These are only labels recorded on each bill (Cash, Card, UPI ...).
 No payment gateway is involved.
 """
+from __future__ import annotations
 from .. import db
 from ..errors import NotFoundError, ValidationError
 

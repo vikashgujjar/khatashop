@@ -3,6 +3,7 @@
 Uses the PHP tables: procurement_note(+_detail), issuing_note(+_detail),
 consumption_note(+_detail) and consumption_formula.
 """
+from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal

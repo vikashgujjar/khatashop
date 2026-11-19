@@ -1,4 +1,5 @@
-from flask import current_app, g, request
+from __future__ import annotations
+from ..core import current_app, g, request
 
 from ..utils import to_int
 

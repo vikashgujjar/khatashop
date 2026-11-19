@@ -4,6 +4,7 @@ tracking Route::group([... 'prefix' => ...]) and Route::prefix(...)->group(...) 
 Usage:  python tools/list_legacy_routes.py <laravel project dir>  > routes.tsv
 Output: METHOD <tab> URL <tab> Controller@method
 """
+from __future__ import annotations
 import re
 import sys
 from pathlib import Path

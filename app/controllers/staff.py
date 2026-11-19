@@ -1,8 +1,9 @@
 """Staff logins of the current restaurant (old Counter Manager / Executive / ... pages), and Attendance."""
+from __future__ import annotations
 import calendar
 from datetime import date
 
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
+from ..core import Blueprint, flash, redirect, render_template, request, send_file, url_for
 
 from .. import db
 from ..errors import ValidationError

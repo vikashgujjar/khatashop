@@ -36,13 +36,17 @@ orders and bills than any local copy, and the local copy contains test data.
 4. **Create your super admin on the server** (from the `khatashop_python` folder; pick a new strong password)
 
    ```
-   .venv/bin/python run.py --create-super-admin you@example.com --name "Your Name" --password "<new password>"
+   python3 run.py --create-super-admin you@example.com --name "Your Name" --password "<new password>"
    ```
+
+   No `pip install` and no virtual environment are needed: the app uses only Python 3.9+ and the
+   MySQL driver bundled in `vendor/`.
 
 5. **Point the app at the live database** in `db_config.json` on the server (host, user, password,
    database name). This file is not in git; copy `db_config.example.json` if needed.
 
-6. **Check**: `.venv/bin/python run.py --check` should print `Database OK` and the bill count.
+6. **Check**: `python3 run.py --check` should print `Database OK`, `App tables OK` and the password method.
+   Start it with `python3 run.py`.
 
 ## After going live
 

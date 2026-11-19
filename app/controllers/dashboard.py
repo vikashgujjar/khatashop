@@ -1,6 +1,7 @@
+from __future__ import annotations
 from datetime import timedelta
 
-from flask import Blueprint, redirect, render_template, request, url_for
+from ..core import Blueprint, redirect, render_template, request, url_for
 
 from ..models import company as company_model
 from ..models import dashboard

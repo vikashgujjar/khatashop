@@ -1,10 +1,9 @@
 """Builds the bill list as an .xlsx workbook."""
+from __future__ import annotations
 import re
 from io import BytesIO
 
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
+from ..core.xlsx import Alignment, Font, PatternFill, Workbook, get_column_letter
 
 HEADERS = [
     "Sr No", "Bill Number", "Billing Date", "Order Type", "Customer", "Mobile", "Total Quantity", "CGST", "SGST",
